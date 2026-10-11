@@ -41,7 +41,7 @@ static uint8_t *slurp(const std::string &path, uint32_t *size) {
 bool PmdMon::load(int16_t dexNum, bool shiny) {
   if (dexNum < 1 || dexNum > 999) return false;
   unload();
-  char p[64];
+  char p[512];
   snprintf(p, sizeof(p), "%s/p%s%03u.bin", g_spriteDir.c_str(), shiny ? "s" : "", (unsigned)dexNum);
   uint32_t size = 0;
   blob = slurp(p, &size);
