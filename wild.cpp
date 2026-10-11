@@ -157,6 +157,16 @@ void wildAreaLevels(const Pet &p, uint16_t a, uint8_t &lo, uint8_t &hi) {
   }
 }
 
+uint16_t wildRandomOpenArea(const Pet &p, uint8_t r) {
+  uint16_t f = wildAreaFirst(r), end = f + wildAreaCount(r), n = 0;
+  for (uint16_t a = f; a < end; a++) if (wildAreaOpen(p, a)) n++;
+  if (!n) return WILD_NO_AREA;
+  long k = random(n);
+  for (uint16_t a = f; a < end; a++)
+    if (wildAreaOpen(p, a) && k-- == 0) return a;
+  return WILD_NO_AREA;
+}
+
 static bool inRegion(int16_t d, uint8_t region) {
   return region == REGION_ALL || regionOfDex(d) == region;
 }
@@ -267,22 +277,22 @@ uint16_t wildSeenCountIn(const Pet &p, uint8_t region) {
 static const char *const W_STRINGS[LANG_COUNT][W_COUNT] = {
   { "SALVAJE", "ZONA SALVAJE", "Un %s salvaje aparecio!", "%s +%u!",
     "Primero debe nacer", "Esta dormido", "Esta muy cansado", "Falta el pack",
-    "Ahora no" },
+    "Ahora no", "Nv %u-%u", "Medalla %u", "Sin zona abierta" },
   { "WILD", "WILD AREA", "A wild %s appeared!", "%s +%u!",
     "Hatch it first", "It is asleep", "Too tired", "Needs pack",
-    "Not now" },
+    "Not now", "Lv %u-%u", "Badge %u", "No open area" },
   { "SAUVAGE", "ZONE SAUVAGE", "Un %s sauvage apparait!", "%s +%u!",
     "Il doit eclore", "Il dort", "Trop fatigue", "Pack manquant",
-    "Pas maintenant" },
+    "Pas maintenant", "Nv %u-%u", "Badge %u", "Aucune zone" },
   { "WILD", "WILDNIS", "Ein wildes %s erscheint!", "%s +%u!",
     "Erst ausbrueten", "Es schlaeft", "Zu muede", "Paket fehlt",
-    "Nicht jetzt" },
+    "Nicht jetzt", "Lv %u-%u", "Orden %u", "Kein Gebiet" },
   { "SELVATICO", "ZONA SELVATICA", "Appare un %s selvatico!", "%s +%u!",
     "Deve schiudersi", "Sta dormendo", "Troppo stanco", "Manca il pack",
-    "Non ora" },
+    "Non ora", "Lv %u-%u", "Medaglia %u", "Nessuna zona" },
   { "SELVAGEM", "ZONA SELVAGEM", "Um %s selvagem apareceu!", "%s +%u!",
     "Deve chocar antes", "Esta dormindo", "Muito cansado", "Falta o pack",
-    "Agora nao" },
+    "Agora nao", "Nv %u-%u", "Insignia %u", "Nenhuma zona" },
 };
 
 const char *WT(WildStr s) {
@@ -301,4 +311,9 @@ const char *wildRefusalText(WildRefusal r) {
     case WILD_AREA_NOT_NOW: return WT(W_NOT_NOW);
     default: return "";   // WILD_AREA_LOCKED: the area screen formats its badge number
   }
+}
+
+void wildRowReason(WildRefusal r, uint8_t areaTier, char *out, size_t n) {
+  if (r == WILD_AREA_LOCKED) snprintf(out, n, WT(W_NEED_BADGE_FMT), (unsigned)(areaTier ? areaTier - 1 : 0));
+  else snprintf(out, n, "%s", wildRefusalText(r));
 }

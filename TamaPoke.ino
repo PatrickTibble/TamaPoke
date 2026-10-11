@@ -1549,6 +1549,7 @@ void onSwipe(int dir) {
   // it sits on TOP of the starter/gallery/gym screens -- each of which has its
   // own horizontal handler that would otherwise swallow the gesture. Paging a
   // screen by closing it is the bug this project shipped four times.
+  if (wildAreaSwipe(dir)) return;  // FORK(wild)
   if (rpickSwipe(dir)) return;
   if (pet.awaitingStarter()) return;  // bloqueado durante la eleccion de inicial
   if (menuOpen) { menuOpen = false; return; }   // any swipe closes the menu
@@ -1685,6 +1686,7 @@ void onTap(int16_t x, int16_t y) {
     return;
   }
   if (gymOpen && gymPick) {
+    if (wildAreasShown) { wildAreaTap(x, y); return; }  // FORK(wild)
     if (wildPickOpen) { wildPickTap(x, y); return; }  // FORK(wild)
     int r = regionPickTap(x, y, RPICK_FOR_GYMS);
     if (r >= 0) {
@@ -2241,7 +2243,7 @@ void render() {
     return;
   }
   if (gymOpen) {
-    if (gymPick) renderRegionPick(wildRpickMode());  // FORK(wild)
+    if (gymPick) { if (wildAreasShown) wildRenderAreas(); else renderRegionPick(wildRpickMode()); }  // FORK(wild)
     else renderGyms();
     return;
   }

@@ -22,10 +22,10 @@ todos:
     status: completed
   - id: p3-screen
     content: "Phase 3 - wild_ui.h area screen: state, geometry + static_asserts, paging, taps, wildExitToGyms, wildRpickMode 0xFF, startWildBattle(region, area) -> WildRefusal, refusal routing, wildAfterBattle, wildPickBack; WILD [r] picks a random open area"
-    status: pending
+    status: completed
   - id: p3-hooks-strings
     content: Phase 3 - FORK(wild) hooks in TamaPoke.ino (onSwipe, tap, render) declared in wild.h; W_LV_FMT, W_NEED_BADGE_FMT, W_NOT_NOW, W_NO_AREA in 6 languages, ASCII, <= 16 chars
-    status: pending
+    status: completed
   - id: p3-tests
     content: Phase 3 - wild_ui_test (needs_sketch, FORK(wild) line in run.sh), negative-check the UI guards, emulator click-through + screenshots, arduino-cli compile
     status: pending
@@ -128,6 +128,14 @@ Implements sections 3 and 4 and the first four strings of section 5. This is the
 - An emulator click-through with screenshots of a locked tier, a "Not now" row and a full page.
 
 **Done when** a wild battle can be reached only through region, then area, then team, the suite is green, and `arduino-cli compile` passes. The emulator build alone does not count (CLAUDE.md trap 4).
+
+**Result (2026-10-11):** `run.sh` 38/38. `arduino-cli compile` passes: sketch 1,779,955 bytes (56%), globals 66,888 (+8). The area names are in the `.bin`. `wild_ui_test` drives the real `onTap`/`onSwipe`/`battleTap`. It taps all 245 areas across the seven regions by paging, and it checks the start page at 0, 2 and all badges, the locked-tier and needs-pack denials, the return to the same page after a fight, both exits to the gym chooser, the console, and the 3 s hold. All five UI guards were broken on purpose, and each made the test fail. Differences from the spec:
+
+- **`WILD_NO_SQUAD`** was appended to `WildRefusal`, since the spec names it but the enum did not have it. **`wildSquadTop()` went now and not in phase 4**: area levels made it dead code.
+- **Routing has one predicate.** `wildFight()` and `wildAfterBattle()` share `wildRoute()`: they go to the list if `wildPetRefusal()` is OK, and to the gym chooser otherwise. A row tapped by a pet that has become too tired also leaves through `wildExitToGyms()`. That is the path that makes the "clear only `wildPickOpen`" negative check fail; without it, no caller reaches the exit while the list is up.
+- **`wildRowReason()` lives in `wild.cpp`**, with `WILD_ROW_REASON_MAX` 16 and `WILD_ROW_LV_MAX` 8 in `wild.h`, so the test checks every language against the same limits `wild_ui.h` asserts. `wildAreaAtRow()` and `wildAreaRowRect()` are the test's view of the page; render and tap use them too.
+- A single-level range prints as "Lv 12", not "Lv 12-12".
+- **Screenshots** come from `wild_ui_test` when `WILD_SHOT_DIR` is set (`main_sdl.cpp` is upstream). They cover a first page, a locked tier, a needs-pack row and a full overflowing page (Hoenn tier 1, 7 areas). There is no "Not now" shot, because no real area can read Not now (phase 2). The `run.sh` hook wraps `needs_sketch` rather than editing its upstream list.
 
 ### Phase 4: serial, retirement and the reward gap
 
