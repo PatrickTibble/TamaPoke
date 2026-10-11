@@ -7,13 +7,13 @@ todos:
     status: completed
   - id: p1-gen-core
     content: "Phase 1 - generator: tools/gen_wild.py doc discovery from dex_data.REGIONS, ladder from trainers.h, section classification, row fix/skip/parse, names, levels, normalization, locations, time tags, evolution clamp, weights, table build, wild_areas.h emit, report (section 1)"
-    status: pending
+    status: completed
   - id: p1-gen-regions
     content: "Phase 1 - bring up the override tables region by region (Kanto, Johto, Hoenn, Sinnoh, Unova, Kalos, Alola) until each report matches its Expected outcomes; unused override entries fail"
-    status: pending
+    status: completed
   - id: p1-gen-guards
     content: "Phase 1 - --check, --selftest fixtures (must-fail and must-pass), FORK(wild) gen_wild step in run.sh, negative-check the generator guards, commit wild_areas.h"
-    status: pending
+    status: completed
   - id: p2-logic
     content: "Phase 2 - wild.h/.cpp additive: accessors, wildRegionHasAreas, wildTier, wildHour/wildTimeMask, wildAreaOpen, wildAreaWhyClosed, wildRollArea, wildAreaLevels, WILD_AREA_LOCKED/NOT_NOW appended, wildRefusalText; old wildRoll untouched"
     status: pending
@@ -91,6 +91,11 @@ Implements section 1 in full. `wild_areas.h` is emitted and committed, but nothi
 3. **Guards:** `--check`, the `--selftest` fixtures (both the must-fail and the must-pass lists), and the tagged `gen_wild.py` step in `run.sh`. Negative-check the unused-override rule, the depth-0 split and skip-before-parse.
 
 **Done when** all seven reports match the expected outcomes, the table is 24 KB or less, `--check` and `--selftest` pass from `run.sh`, and `--check` fails after a hand edit to the header.
+
+**Result (2026-10-11):** 245 areas, 1,031 slots and 53 tier titles, about 15.9 KB. Every expected outcome in section 1 matches the report and the header. `run.sh` is 37/37 with the new step, and a hand-edited header stops it. Breaking the unused-override rule, the depth-0 split or skip-before-parse each makes `--selftest` fail. Differences from the spec:
+
+- Three extra guards. A time note found only in a Location cell fails, which is what forces the Sinnoh Noctowl `ROW_FIX`. An `EXTRA_AREAS` entry that is already listed on an Available Areas line fails, and so does one that receives no slot.
+- Johto tier 6 (`OLIVINE`) owns no area: Jasmine's rows all land in Chuck's tier-5 routes. Like Sinnoh tier 4, it gets no page.
 
 ### Phase 2: area logic, additive
 

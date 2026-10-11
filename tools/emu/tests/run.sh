@@ -44,6 +44,9 @@ if command -v arduino-cli >/dev/null; then
   fi
 fi
 
+# FORK(wild): wild_areas.h is generated from docs/*_region_pokemon_encounters.md; a stale header or a guard that no longer fails stops the run
+if command -v python3 >/dev/null; then python3 "$ROOT/tools/gen_wild.py" --check && python3 "$ROOT/tools/gen_wild.py" --selftest >/dev/null || { echo "=== gen_wild.py --check / --selftest FAILED"; exit 1; }; fi  # FORK(wild)
+
 # arrays, not a string: the sprite dir has to reach the compiler still quoted,
 # and passing these through eval silently strips them
 CORE=("$ROOT/gbsynth.cpp" "$ROOT/pet.cpp" "$ROOT/i18n.cpp" "$ROOT/party.cpp" "$ROOT/battle.cpp" "$ROOT/link.cpp" "$ROOT/save.cpp" "$ROOT/wild.cpp")
