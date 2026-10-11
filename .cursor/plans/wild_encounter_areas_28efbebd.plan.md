@@ -2,29 +2,41 @@
 name: Wild encounter areas
 overview: "Drive every wild battle from docs/<region>_region_pokemon_encounters.md, for all seven regions (Kanto, Johto, Hoenn, Sinnoh, Unova, Kalos, Alola): the player picks an area from a badge-gated paged list, and the foe's species, odds and level come from that area's table, with time-of-day rows gated by the RTC. The .md files are the only data source; a host-side generator compiles them into a flash-resident table that only wild.cpp includes. The generator requires a document for every region, so the old random roll (wildRoll and its level scaling) is retired. Builds on the existing fork-only wild feature (wild.h/.cpp, wild_ui.h) and its FORK(wild) hook rules."
 todos:
-  - id: md-source
-    content: Delete the untracked docs/kanto_region_pokemon_encounters.json; the seven .md files stay as they are and are the only source
+  - id: p0-prep
+    content: "Phase 0 - prep: feature branch, delete docs/kanto_region_pokemon_encounters.json, record a green run.sh + arduino-cli compile baseline"
     status: pending
-  - id: gen-wild
-    content: "tools/gen_wild.py: one doc per dex_data.REGIONS entry (missing = fail), gyms + places from trainers.h, section classification (gym-named / SECTION_TIER / TIER_TITLES / SKIP_SECTIONS, monotonic, tier 1 non-empty), multi-table sections, RARITY then skip-first, depth-0 splits on ',' and ' / ', NFKD, name fallback for forms, per-species italic time tags, NAMES/ALIASES/EXTRA_AREAS/DISPLAY/ROW_FIX/PAIRED_TIMES/TIME_WORDS overrides (every entry must be used), noart drop, evolved-form lower clamp, weights in tenths, area tier = max(listed tier, earliest slot tier), merge duplicates, report, emit wild_areas.h, --check, --selftest"
+  - id: p1-gen-core
+    content: "Phase 1 - generator: tools/gen_wild.py doc discovery from dex_data.REGIONS, ladder from trainers.h, section classification, row fix/skip/parse, names, levels, normalization, locations, time tags, evolution clamp, weights, table build, wild_areas.h emit, report (section 1)"
     status: pending
-  - id: wild-logic
-    content: "wild.h/.cpp: accessors over the private table, wildTier (max of the easy and hard runs, capped at TRAINER_GYMS), wildHour/wildTimeMask, wildAreaOpen, wildAreaWhyClosed, wildRollArea, wildAreaLevels, WildRefusal appends, reward level-gap gate; remove wildRoll/wildEvolveFor/wildLevelFor and their constants"
+  - id: p1-gen-regions
+    content: "Phase 1 - bring up the override tables region by region (Kanto, Johto, Hoenn, Sinnoh, Unova, Kalos, Alola) until each report matches its Expected outcomes; unused override entries fail"
     status: pending
-  - id: area-screen
-    content: "wild_ui.h: paged area screen with fixed geometry, wildRpickMode() returns 0xFF while it is shown, one exit function, startWildBattle(region, area) returning WildRefusal, refusal routing, serial WILD AREAS / WILD r i / WILD r"
+  - id: p1-gen-guards
+    content: "Phase 1 - --check, --selftest fixtures (must-fail and must-pass), FORK(wild) gen_wild step in run.sh, negative-check the generator guards, commit wild_areas.h"
     status: pending
-  - id: hooks
-    content: "FORK(wild) hooks in TamaPoke.ino (onSwipe, tap dispatch, render) with every symbol declared in wild.h; FORK(wild) line in run.sh"
+  - id: p2-logic
+    content: "Phase 2 - wild.h/.cpp additive: accessors, wildRegionHasAreas, wildTier, wildHour/wildTimeMask, wildAreaOpen, wildAreaWhyClosed, wildRollArea, wildAreaLevels, WILD_AREA_LOCKED/NOT_NOW appended, wildRefusalText; old wildRoll untouched"
     status: pending
-  - id: strings
-    content: Append W_LV_FMT, W_NEED_BADGE_FMT, W_NOT_NOW, W_NO_AREA, W_TOO_EASY to W_STRINGS in all 6 languages, ASCII, reasons <= 16 chars
+  - id: p2-tests
+    content: "Phase 2 - wild_test area sections (coverage, tiers, rolls, clamp, per-slot gating, time, weights, ownership, dedupe, packs, table invariants), negative-check each, run.sh + arduino-cli compile"
     status: pending
-  - id: tests
-    content: "Rewrite wild_test for area mode (per-region outcomes, tiers, time, clamp, ownership, dedupe, weights, packs, reward gap, table invariants), add wild_ui_test (needs_sketch), gen_wild.py --check and --selftest from run.sh, negative-check each guard, full run.sh + arduino-cli compile"
+  - id: p3-screen
+    content: "Phase 3 - wild_ui.h area screen: state, geometry + static_asserts, paging, taps, wildExitToGyms, wildRpickMode 0xFF, startWildBattle(region, area) -> WildRefusal, refusal routing, wildAfterBattle, wildPickBack; WILD [r] picks a random open area"
     status: pending
-  - id: docs
-    content: "FORK.md: md is the source, the parser's format contract, section classification, area tier rule, weights, clamp, time windows, the override tables, art-less drop, retired random roll, balance + reward gap, known limits, hooks, how to regenerate"
+  - id: p3-hooks-strings
+    content: "Phase 3 - FORK(wild) hooks in TamaPoke.ino (onSwipe, tap, render) declared in wild.h; W_LV_FMT, W_NEED_BADGE_FMT, W_NOT_NOW, W_NO_AREA in 6 languages, ASCII, <= 16 chars"
+    status: pending
+  - id: p3-tests
+    content: "Phase 3 - wild_ui_test (needs_sketch, FORK(wild) line in run.sh), negative-check the UI guards, emulator click-through + screenshots, arduino-cli compile"
+    status: pending
+  - id: p4-serial-retire
+    content: "Phase 4 - serial WILD AREAS [r] (parsed first) and WILD r i; retire wildRoll/wildEvolveFor/wildLevelFor/wildSquadTop/inRegion/isWildBase/pickTier, their constants and wild_test sections"
+    status: pending
+  - id: p4-reward-gap
+    content: "Phase 4 - wildReward(..., foeLvl, ...) with WILD_REWARD_GAP 10, W_TOO_EASY in 6 languages, battle log line, reward gap test + negative checks for gap and serial order"
+    status: pending
+  - id: p5-docs-verify
+    content: "Phase 5 - FORK.md (section 7), full run.sh, arduino-cli compile from Windows, on-board check of area row touch targets and RTC time gating"
     status: pending
 isProject: false
 ---
@@ -53,6 +65,68 @@ flowchart LR
   battle -->|"pet can still fight"| areaPick
   battle -->|"pet refuses"| gymPick
 ```
+
+## Phases
+
+Each phase lands as its own commit on the feature branch with `run.sh` green and `arduino-cli compile` passing. Sections 1-7 below are the spec; a phase names the parts it implements. Negative checks are done in the phase that adds the guard, not saved for the end.
+
+### Phase 0: prep
+
+- A feature branch off `main`. Delete the untracked `docs/kanto_region_pokemon_encounters.json`.
+- Record a baseline: `bash tools/emu/tests/run.sh` green and `arduino-cli compile` passing before anything changes.
+
+**Done when** the baseline is recorded and the seven `.md` files are the only encounter data in the repo.
+
+### Phase 1: the generator (host only, no firmware change)
+
+Implements section 1 in full. `wild_areas.h` is emitted and committed, but nothing includes it yet, so the firmware is byte-identical.
+
+1. **Core pipeline:** document discovery from `REGIONS`, the ladder from `trainers.h`, section classification, row fix/skip/parse, names, levels, text normalization, locations, time tags, the evolution clamp, weights, table building, the header emit and the report.
+2. **Regions one at a time**, in ladder order: Kanto, Johto, Hoenn, Sinnoh, Unova, Kalos, Alola. For each, add its override entries until the report matches its "Expected outcomes" bullet. These are local checkpoints, not commits: the generator requires every document, so it only passes once all seven do.
+3. **Guards:** `--check`, the `--selftest` fixtures (both the must-fail and the must-pass lists), and the tagged `gen_wild.py` step in `run.sh`. Negative-check the unused-override rule, the depth-0 split and skip-before-parse.
+
+**Done when** all seven reports match the expected outcomes, the table is 24 KB or less, `--check` and `--selftest` pass from `run.sh`, and `--check` fails after a hand edit to the header.
+
+### Phase 2: area logic, additive
+
+Implements section 2, minus the retirement and the reward gap. `wild.cpp` includes `wild_areas.h`; `wildRoll()` and the current UI are untouched, so the game plays exactly as before.
+
+- The accessors, `wildRegionHasAreas`, `wildTier`, `wildHour`/`wildTimeMask`, `wildAreaOpen`, `wildAreaWhyClosed`, `wildRollArea`, `wildAreaLevels`, and `WILD_AREA_LOCKED`/`WILD_AREA_NOT_NOW` appended to `WildRefusal` with `wildRefusalText()` covering `NOT_NOW`.
+- `wild_test` gains the area sections from section 6: coverage, tiers, rolls, evolution clamp, per-slot gating, time gating, weights, ownership, dedupe, packs and table invariants. The old `wildRoll` sections stay until phase 4.
+- Negative checks: the tier gate, the area-tier rule, the per-slot tier filter, the `TRAINER_GYMS` cap, separate runs, the time filter, the no-clock fallback, `TIME_WORDS`, the level range, both halves of the clamp, the weight floor and the duplicate merge.
+
+**Done when** the suite is green, every guard above has been seen to fail, and the firmware compiles with the table in flash.
+
+### Phase 3: the area screen, switched on
+
+Implements sections 3 and 4 and the first four strings of section 5. This is the phase where wild battles start coming from areas.
+
+- `wild_ui.h`: state, geometry with its `static_assert`s, paging, taps, `wildExitToGyms()`, `wildRpickMode()` returning `0xFF`, `startWildBattle(region, area)` returning `WildRefusal`, refusal routing, `wildAfterBattle()` and `wildPickBack()`.
+- The signature change forces the serial command over now: `WILD [r]` picks a random open area. `WILD AREAS` and `WILD r i` wait for phase 4.
+- The `TamaPoke.ino` hooks (`onSwipe`, tap dispatch, render), every symbol declared in `wild.h`.
+- `W_LV_FMT`, `W_NEED_BADGE_FMT`, `W_NOT_NOW` and `W_NO_AREA` in all six languages.
+- `wild_ui_test` as a fresh harness in `needs_sketch`, with its tagged `run.sh` line. Negative checks: overflow paging, the swipe handler, `0xFF` from `wildRpickMode()`, the exit function and the refusal routing in `wildAfterBattle()`.
+- An emulator click-through with screenshots of a locked tier, a "Not now" row and a full page.
+
+**Done when** a wild battle can be reached only through region, then area, then team, the suite is green, and `arduino-cli compile` passes. The emulator build alone does not count (CLAUDE.md trap 4).
+
+### Phase 4: serial, retirement and the reward gap
+
+The rest of sections 2, 3 and 5.
+
+- Serial: `WILD AREAS [r]`, matched before the numeric forms, and `WILD <r> <index>`. Negative-check the parse order.
+- Retire `wildRoll()`, `wildEvolveFor()`, `wildLevelFor()`, `wildSquadTop()`, `inRegion()`, `isWildBase()`, `pickTier()`, their constants and their `wild_test` sections. `rg` for each name must come back empty.
+- The reward gap: `wildReward(..., foeLvl, ...)`, `WILD_REWARD_GAP 10`, `W_TOO_EASY` in six languages and the battle log line. Test both sides of the boundary, then negative-check it.
+
+**Done when** no retired symbol remains, `WILD AREAS 1` lists without starting a battle, and the suite and compile are green.
+
+### Phase 5: docs and hardware
+
+- `FORK.md`, everything listed in section 7.
+- A final full `run.sh` and `arduino-cli compile` from Windows.
+- On a board, checking what the emulator cannot see: whether the area rows and BACK are easy to hit with a finger (the bottom row especially), and whether time gating follows a real RTC (Johto `ROUTE 29` at night versus day).
+
+**Done when** `FORK.md` is written and both board checks pass, or anything they turn up is logged as a follow-up.
 
 ## 1. Data: the .md files, compiled by a generator
 
