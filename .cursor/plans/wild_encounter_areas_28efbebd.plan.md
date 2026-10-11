@@ -3,8 +3,8 @@ name: Wild encounter areas
 overview: "Drive every wild battle from docs/<region>_region_pokemon_encounters.md, for all seven regions (Kanto, Johto, Hoenn, Sinnoh, Unova, Kalos, Alola): the player picks an area from a badge-gated paged list, and the foe's species, odds and level come from that area's table, with time-of-day rows gated by the RTC. The .md files are the only data source; a host-side generator compiles them into a flash-resident table that only wild.cpp includes. The generator requires a document for every region, so the old random roll (wildRoll and its level scaling) is retired. Builds on the existing fork-only wild feature (wild.h/.cpp, wild_ui.h) and its FORK(wild) hook rules."
 todos:
   - id: p0-prep
-    content: "Phase 0 - prep: feature branch, delete docs/kanto_region_pokemon_encounters.json, record a green run.sh + arduino-cli compile baseline"
-    status: pending
+    content: "Phase 0 - prep: record a green run.sh + arduino-cli compile baseline"
+    status: completed
   - id: p1-gen-core
     content: "Phase 1 - generator: tools/gen_wild.py doc discovery from dex_data.REGIONS, ladder from trainers.h, section classification, row fix/skip/parse, names, levels, normalization, locations, time tags, evolution clamp, weights, table build, wild_areas.h emit, report (section 1)"
     status: pending
@@ -72,10 +72,15 @@ Each phase lands as its own commit on the feature branch with `run.sh` green and
 
 ### Phase 0: prep
 
-- A feature branch off `main`. Delete the untracked `docs/kanto_region_pokemon_encounters.json`.
 - Record a baseline: `bash tools/emu/tests/run.sh` green and `arduino-cli compile` passing before anything changes.
 
 **Done when** the baseline is recorded and the seven `.md` files are the only encounter data in the repo.
+
+**Baseline (2026-10-11, branch `pt/feat/wild-encounters`):**
+
+- `run.sh`: 37 suites passed, 0 failed. It runs in WSL Ubuntu (`wsl -d Ubuntu`; the default distro is `docker-desktop`, which has no bash). Ubuntu has no `arduino-cli`, so the suite's own firmware step is skipped there.
+- `arduino-cli compile` from Windows, using the CLI bundled with the Arduino IDE (`%LOCALAPPDATA%\Programs\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe`). Core `esp32:esp32` 3.3.12; GFX Library for Arduino 1.6.7, SensorLib 0.4.1, XPowersLib 0.3.3.
+- Sketch 1,778,219 bytes (56% of 3,145,728). Globals 66,880 bytes (20%). Phase 2's table should add about 15 KB of flash and no RAM.
 
 ### Phase 1: the generator (host only, no firmware change)
 
