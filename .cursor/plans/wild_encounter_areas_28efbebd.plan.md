@@ -28,7 +28,7 @@ todos:
     status: completed
   - id: p3-tests
     content: Phase 3 - wild_ui_test (needs_sketch, FORK(wild) line in run.sh), negative-check the UI guards, emulator click-through + screenshots, arduino-cli compile
-    status: pending
+    status: completed
   - id: p4-serial-retire
     content: Phase 4 - serial WILD AREAS [r] (parsed first) and WILD r i; retire wildRoll/wildEvolveFor/wildLevelFor/wildSquadTop/inRegion/isWildBase/pickTier, their constants and wild_test sections
     status: completed
@@ -37,7 +37,7 @@ todos:
     status: completed
   - id: p5-docs-verify
     content: Phase 5 - FORK.md (section 7), full run.sh, arduino-cli compile from Windows, on-board check of area row touch targets and RTC time gating
-    status: pending
+    status: in_progress
 isProject: false
 ---
 
@@ -162,6 +162,11 @@ The rest of sections 2, 3 and 5.
 - On a board, checking what the emulator cannot see: whether the area rows and BACK are easy to hit with a finger (the bottom row especially), and whether time gating follows a real RTC (Johto `ROUTE 29` at night versus day).
 
 **Done when** `FORK.md` is written and both board checks pass, or anything they turn up is logged as a follow-up.
+
+**Result (2026-10-11), board checks still open:** `FORK.md` is written. It covers everything in section 7, plus what the first plan's docs item asked for: every upstream edit, the sync procedure and the upgrade rules. `run.sh` is 38/38. `arduino-cli compile` passes: sketch 1,780,747 bytes (56%), globals 66,888, both unchanged from phase 4. The two board checks have not been run. `FORK.md` § "On the board" has the procedure: every row and BACK by finger, then Johto `ROUTE 29` (`WILD 1 0`) at 23:00 and 12:00 via `RTCSET`. Differences from the spec:
+
+- `FORK.md` also lists the upstream edits that carry no `FORK(wild)` tag: `save.cpp`'s `SAVE_FIELDS` entry, the source lists in `build.sh` and in `run.sh`'s `CORE`, `save_test`, the emulator README, the `host_impl.cpp` path buffer and `.gitattributes`. `rg "FORK\(wild\)"` alone would miss them after a merge.
+- Logged as follow-ups: `wild_upgrade_test` from the first plan was never written, and the Pokedex detail does not use `wildSeen()`.
 
 ## 1. Data: the .md files, compiled by a generator
 
