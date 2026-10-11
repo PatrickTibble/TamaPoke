@@ -11,6 +11,7 @@
 #include "pet.h"
 #include "party.h"
 #include "save.h"
+#include "wild.h"
 #include <cstdio>
 #include <set>
 #include <string>
@@ -47,6 +48,7 @@ int main(){
   for (int i=0;i<BOX_SLOTS;i++){ PartyMon m; m.dex=1+i*3; m.level=10+i;
     m.ivAtk=m.ivDef=m.ivSpe=m.ivHp=11; party.box[i]=m; }
   party.boxSave();
+  wildLoad(); wildMarkSeen(152); wildMarkSeen(400);
   // renameTrainer() persists, and save() writes every field -- so this is also
   // what commits everything set above. save() itself is private on purpose.
   pet.renameTrainer("DYLAN");
@@ -125,6 +127,9 @@ int main(){
   bool moves = true;
   for (int i=0;i<MOVE_SLOTS;i++) if (p2.moves[i]!=pet.moves[i]) moves=false;
   ck(moves, "and the moveset");
+  wildLoad();
+  ck(wildSeen(p2,152) && wildSeen(p2,400) && !wildSeen(p2,153),
+     "the seen-in-the-wild bitmap, exactly");
 
   ck(q2.count()==PARTY_SLOTS, "the whole party is back");
   bool party_ok = true;

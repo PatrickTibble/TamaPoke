@@ -10,7 +10,9 @@ bash tools/emu/build.sh
 tools/emu/tamapoke-emu --scale 2 --fast 60
 ```
 
-It compiles `TamaPoke.ino`, `pet.cpp`, `i18n.cpp` and `party.cpp` **unmodified**.
+It compiles `TamaPoke.ino`, `pet.cpp`, `i18n.cpp`, `party.cpp`, `battle.cpp`,
+`link.cpp`, `save.cpp`, `gbsynth.cpp` and `wild.cpp` **unmodified**. New
+firmware `.cpp` files must be added to both `build.sh` and `tests/run.sh`.
 Only the hardware layer is replaced, so what you see is what the panel draws —
 the same 466×466 RGB565 framebuffer, the same 5×7 font, the same code paths.
 
