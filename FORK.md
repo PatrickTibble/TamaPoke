@@ -3,8 +3,8 @@
 This is a fork of [DylanPDao/TamaPoke](https://github.com/DylanPDao/TamaPoke)
 (`upstream`). It adds one feature, **wild battles driven by per-region encounter
 areas**, and is built so that pulling upstream stays a routine merge.
-`README.md`, `CLAUDE.md` and `FW_VERSION` describe upstream and are deliberately
-not edited; this file is where the fork documents itself.
+`README.md` and `CLAUDE.md` describe upstream and are deliberately not edited;
+this file is where the fork documents itself.
 
 ## Fork rules
 
@@ -20,10 +20,14 @@ not edited; this file is where the fork documents itself.
 - **Nothing positional is shared with upstream.** Strings live in the fork's own
   `W_STRINGS` table in `wild.cpp`, never in `i18n.cpp`'s positional `STRINGS`.
   The one NVS key is prefixed (`w_seen`). The `SCR_` enum is unchanged.
-- **Version-like files are left alone**: `FW_VERSION`, the README badge and the
-  `web/` binaries conflict on every upstream release. An unchanged `FW_VERSION`
-  also keeps LAN battles working against boards on upstream builds; the fork adds
-  no moves and no species, so the link fingerprint matches.
+- **`FW_VERSION` is upstream's version plus a fork patch number** (`3.11.1` is
+  upstream 3.11 with this fork). On each upstream merge, take upstream's value and
+  re-append the patch number; the line is tagged `FORK(wild)` so the conflict is
+  expected. It is display-only (boot log, settings): the LAN hello compares
+  `LINK_PROTO` and a table fingerprint, never `FW_VERSION`, and the fork adds no
+  moves and no species, so LAN battles against upstream boards still work.
+- **The README badge and the `web/` binaries are left alone**: they conflict on
+  every upstream release. Rebuild `web/firmware/` locally to flash, never commit it.
 
 ## Every upstream edit
 
