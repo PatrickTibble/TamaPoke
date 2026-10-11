@@ -7,15 +7,15 @@
 #pragma once
 #include <stdint.h>
 #include "dex.h"
+#include "wild.h"
 
 static_assert(REGION_COUNT == 8 && REGION_ALL == 7,
               "wild_areas.h is stale: re-run tools/gen_wild.py");
-
-#define WILD_NAME_MAX 15
-#define WILD_TM_MORNING 1
-#define WILD_TM_DAY 2
-#define WILD_TM_NIGHT 4
-#define WILD_TM_ALL 7
+// wild.h owns these, since the sketch cannot include this table; the
+// generator validated names and time masks against these values.
+static_assert(WILD_NAME_MAX == 15 && WILD_TM_MORNING == 1 && WILD_TM_DAY == 2 &&
+              WILD_TM_NIGHT == 4 && WILD_TM_ALL == 7,
+              "wild.h and tools/gen_wild.py disagree");
 
 struct WildArea { uint8_t region, tier; const char *name; };
 struct WildSlot { uint16_t area; int16_t dex; uint16_t weight; uint8_t tier, lo, hi, tmask; };

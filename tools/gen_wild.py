@@ -679,15 +679,16 @@ def emit(regions, gyms):
          '#pragma once',
          '#include <stdint.h>',
          '#include "dex.h"',
+         '#include "wild.h"',
          '',
          'static_assert(REGION_COUNT == %d && REGION_ALL == %d,' % (n_reg + 1, n_reg),
          '              "wild_areas.h is stale: re-run tools/gen_wild.py");',
-         '',
-         '#define WILD_NAME_MAX %d' % NAME_MAX,
-         '#define WILD_TM_MORNING %d' % TM_M,
-         '#define WILD_TM_DAY %d' % TM_D,
-         '#define WILD_TM_NIGHT %d' % TM_N,
-         '#define WILD_TM_ALL %d' % TM_ALL,
+         '// wild.h owns these, since the sketch cannot include this table; the',
+         '// generator validated names and time masks against these values.',
+         'static_assert(WILD_NAME_MAX == %d && WILD_TM_MORNING == %d && WILD_TM_DAY == %d &&'
+         % (NAME_MAX, TM_M, TM_D),
+         '              WILD_TM_NIGHT == %d && WILD_TM_ALL == %d,' % (TM_N, TM_ALL),
+         '              "wild.h and tools/gen_wild.py disagree");',
          '',
          'struct WildArea { uint8_t region, tier; const char *name; };',
          'struct WildSlot { uint16_t area; int16_t dex; uint16_t weight; uint8_t tier, lo, hi, tmask; };',
@@ -829,6 +830,22 @@ def selftest():
              '// ROUTE 126: LANTURN'),
             ('"Lycanroc (Midday / Midnight)" is one species', '// PONI CANYON: LYCANROC')]:
         ok = needle in text
+        print('%s  %s' % ('PASS' if ok else 'FAIL', what))
+        bad += not ok
+
+    # No document rate rounds to zero today, so the weight floors are driven here.
+    # There are two, and each hides the other: "each" skips the share floor, a
+    # split row is floored by the share even when its rate was not.
+    for what, old, new, needle in [
+            ('a 0.04% "each" rate is floored to weight 1 (the rate floor)',
+             '| Viridian Forest | 3–5 | Rare (5%) |', '| Viridian Forest | 3–5 | Rare (0.04% each) |',
+             '// VIRIDIAN FOREST: PIKACHU'),
+            ('a 0.04% row split two ways is floored to weight 1 (the share floor)',
+             '| Safari Zone | 22–26 | Rare |', '| Safari Zone | 22–26 | Rare (0.04%) |',
+             '// SAFARI ZONE: SCYTHER')]:
+        tiny, _ = _run(_edit_doc('KANTO', old, new))
+        m = re.search(r'\{ \d+, \d+, (\d+), [^}]*\},  ' + re.escape(needle), tiny)
+        ok = bool(m) and m.group(1) == '1'
         print('%s  %s' % ('PASS' if ok else 'FAIL', what))
         bad += not ok
 

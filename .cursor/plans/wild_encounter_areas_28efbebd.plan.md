@@ -9,34 +9,34 @@ todos:
     content: "Phase 1 - generator: tools/gen_wild.py doc discovery from dex_data.REGIONS, ladder from trainers.h, section classification, row fix/skip/parse, names, levels, normalization, locations, time tags, evolution clamp, weights, table build, wild_areas.h emit, report (section 1)"
     status: completed
   - id: p1-gen-regions
-    content: "Phase 1 - bring up the override tables region by region (Kanto, Johto, Hoenn, Sinnoh, Unova, Kalos, Alola) until each report matches its Expected outcomes; unused override entries fail"
+    content: Phase 1 - bring up the override tables region by region (Kanto, Johto, Hoenn, Sinnoh, Unova, Kalos, Alola) until each report matches its Expected outcomes; unused override entries fail
     status: completed
   - id: p1-gen-guards
-    content: "Phase 1 - --check, --selftest fixtures (must-fail and must-pass), FORK(wild) gen_wild step in run.sh, negative-check the generator guards, commit wild_areas.h"
+    content: Phase 1 - --check, --selftest fixtures (must-fail and must-pass), FORK(wild) gen_wild step in run.sh, negative-check the generator guards, commit wild_areas.h
     status: completed
   - id: p2-logic
     content: "Phase 2 - wild.h/.cpp additive: accessors, wildRegionHasAreas, wildTier, wildHour/wildTimeMask, wildAreaOpen, wildAreaWhyClosed, wildRollArea, wildAreaLevels, WILD_AREA_LOCKED/NOT_NOW appended, wildRefusalText; old wildRoll untouched"
-    status: pending
+    status: completed
   - id: p2-tests
-    content: "Phase 2 - wild_test area sections (coverage, tiers, rolls, clamp, per-slot gating, time, weights, ownership, dedupe, packs, table invariants), negative-check each, run.sh + arduino-cli compile"
-    status: pending
+    content: Phase 2 - wild_test area sections (coverage, tiers, rolls, clamp, per-slot gating, time, weights, ownership, dedupe, packs, table invariants), negative-check each, run.sh + arduino-cli compile
+    status: completed
   - id: p3-screen
     content: "Phase 3 - wild_ui.h area screen: state, geometry + static_asserts, paging, taps, wildExitToGyms, wildRpickMode 0xFF, startWildBattle(region, area) -> WildRefusal, refusal routing, wildAfterBattle, wildPickBack; WILD [r] picks a random open area"
     status: pending
   - id: p3-hooks-strings
-    content: "Phase 3 - FORK(wild) hooks in TamaPoke.ino (onSwipe, tap, render) declared in wild.h; W_LV_FMT, W_NEED_BADGE_FMT, W_NOT_NOW, W_NO_AREA in 6 languages, ASCII, <= 16 chars"
+    content: Phase 3 - FORK(wild) hooks in TamaPoke.ino (onSwipe, tap, render) declared in wild.h; W_LV_FMT, W_NEED_BADGE_FMT, W_NOT_NOW, W_NO_AREA in 6 languages, ASCII, <= 16 chars
     status: pending
   - id: p3-tests
-    content: "Phase 3 - wild_ui_test (needs_sketch, FORK(wild) line in run.sh), negative-check the UI guards, emulator click-through + screenshots, arduino-cli compile"
+    content: Phase 3 - wild_ui_test (needs_sketch, FORK(wild) line in run.sh), negative-check the UI guards, emulator click-through + screenshots, arduino-cli compile
     status: pending
   - id: p4-serial-retire
-    content: "Phase 4 - serial WILD AREAS [r] (parsed first) and WILD r i; retire wildRoll/wildEvolveFor/wildLevelFor/wildSquadTop/inRegion/isWildBase/pickTier, their constants and wild_test sections"
+    content: Phase 4 - serial WILD AREAS [r] (parsed first) and WILD r i; retire wildRoll/wildEvolveFor/wildLevelFor/wildSquadTop/inRegion/isWildBase/pickTier, their constants and wild_test sections
     status: pending
   - id: p4-reward-gap
-    content: "Phase 4 - wildReward(..., foeLvl, ...) with WILD_REWARD_GAP 10, W_TOO_EASY in 6 languages, battle log line, reward gap test + negative checks for gap and serial order"
+    content: Phase 4 - wildReward(..., foeLvl, ...) with WILD_REWARD_GAP 10, W_TOO_EASY in 6 languages, battle log line, reward gap test + negative checks for gap and serial order
     status: pending
   - id: p5-docs-verify
-    content: "Phase 5 - FORK.md (section 7), full run.sh, arduino-cli compile from Windows, on-board check of area row touch targets and RTC time gating"
+    content: Phase 5 - FORK.md (section 7), full run.sh, arduino-cli compile from Windows, on-board check of area row touch targets and RTC time gating
     status: pending
 isProject: false
 ---
@@ -106,6 +106,15 @@ Implements section 2, minus the retirement and the reward gap. `wild.cpp` includ
 - Negative checks: the tier gate, the area-tier rule, the per-slot tier filter, the `TRAINER_GYMS` cap, separate runs, the time filter, the no-clock fallback, `TIME_WORDS`, the level range, both halves of the clamp, the weight floor and the duplicate merge.
 
 **Done when** the suite is green, every guard above has been seen to fail, and the firmware compiles with the table in flash.
+
+**Result (2026-10-11):** `run.sh` 37/37, `wild_test` gained 63 area checks over 490,000 rolls. `arduino-cli compile` passes: sketch 1,780,539 bytes (+2.3 KB), globals unchanged at 66,880. The table itself is not in the image yet: nothing in the sketch calls the accessors, so the linker drops it until phase 3 wires the screen. Every guard listed above was broken and made `wild_test` fail, except the weight floor (below). Differences from the spec:
+
+- **`WILD_NAME_MAX` and `WILD_TM_*` live in `wild.h`**, not the header: the sketch needs them (`wild_ui.h`'s `static_assert`, slot masks) and cannot include the table. `wild_areas.h` now includes `wild.h` and `static_assert`s that the generator's values agree.
+- **No area in the documents can read "Not now".** Every area has an all-day slot at its opening tier, at every badge count. The reason order is therefore tested through `wildWhyClosedOf()`, a seam that runs the same templated rule over synthetic `WildSlotView`s. Phase 3's "Not now" row screenshot and deny-tap check cannot come from real data either.
+- **The weight floor is unreachable from data** (no rate below 1%, smallest keyword 10), and there are two floors (rate and share) that each mask the other. Both are now driven by `--selftest` must-pass fixtures (a 0.04% `each` row, a 0.04% two-species row), each negative-checked separately.
+- `W_NOT_NOW` landed here, since `wildRefusalText()` needs it; phase 3 adds the other three strings.
+- Added `wildSlotTotal()` so `wild_test` can prove every slot is reachable from an area of its own region.
+- The clamp check identifies a same-row pair by equal tier, top level AND weight: tier and top alone paired Hoenn's separate Wurmple 2-6 and Silcoon 3-6 rows, whose levels are the document's by design.
 
 ### Phase 3: the area screen, switched on
 
