@@ -8,6 +8,7 @@
 #include "pet.h"
 #include "party.h"
 #include "wild.h"
+#include "battle.h"
 #include "i18n.h"
 #include <cstdio>
 #include <cstdlib>
@@ -29,7 +30,10 @@ extern Arduino_Canvas *gfx;
 extern Pet pet;
 extern bool gymOpen, gymPick, pickOpen, battleOpen, btlOver;
 extern bool cardOpen, galleryOpen, clockOpen, kbOpen, menuOpen, partyOpen, playerOpen, lanOpen;
-extern uint8_t rpickPage, btlMsgCount, dimStage;
+extern uint8_t rpickPage, btlMsgCount, dimStage, btlTrainGain;
+extern bool btlWon, btlPetIn;
+extern char btlMsg[6][40];
+extern Combatant btlFoe;
 extern uint32_t confirmUntil;
 extern bool holdFired;
 
@@ -285,6 +289,58 @@ int main(){
     wildSerial(String("WILD 0"));
     ck(!battleOpen, "a tired pet is refused at the console");
     fit(80);
+  }
+
+  // ---- WILD AREAS lists without fighting; WILD <r> <index> fights in exactly that area
+  {
+    // A misparsed AREAS falls back to the egg region, so that must be one that can fight.
+    uint8_t was=pet.region; pet.region=KANTO;
+    allBadges(0); fit(80); reset();
+    wildSerial(String("WILD"));
+    ck(battleOpen, "(bare WILD fights in the egg region, so a misparse would too)");
+    endBattle(); reset();
+    wildSerial(String("WILD AREAS 1"));
+    ck(!battleOpen, "WILD AREAS 1 lists and does not start a battle");
+    wildSerial(String("WILD AREAS"));
+    ck(!battleOpen, "(nor does WILD AREAS with no region)");
+    pet.region=was;
+    int open=-1, shut=-1;
+    for (uint16_t i=0;i<wildAreaCount(JOHTO);i++){
+      bool o=wildAreaOpen(pet,wildAreaFirst(JOHTO)+i);
+      if (o && open<0) open=i;
+      if (!o && shut<0) shut=i;
+    }
+    char cmd[32];
+    if (open>=0 && shut>=0){
+      snprintf(cmd,sizeof(cmd),"WILD 1 %d",shut); wildSerial(String(cmd));
+      ck(!battleOpen, "WILD 1 <a closed area> is refused");
+      snprintf(cmd,sizeof(cmd),"WILD 1 %d",open); wildSerial(String(cmd));
+      ck(battleOpen && btlWild && wildArea==wildAreaFirst(JOHTO)+open, "WILD 1 <an open area> fights in that very area");
+      endBattle();
+    } else ck(false, "(Johto has an open and a shut area with no badges)");
+    reset();
+    snprintf(cmd,sizeof(cmd),"WILD 1 %u",(unsigned)wildAreaCount(JOHTO)); wildSerial(String(cmd));
+    ck(!battleOpen, "an index past the region's last area is refused");
+    wildSerial(String("WILD 1 -1"));
+    ck(!battleOpen, "and so is a negative one");
+  }
+
+  // ---- a win against a foe far below the pet says why it trained nothing
+  {
+    allBadges(0); fit(80); reset();
+    pet.trAtk=pet.trDef=pet.trSpe=0;
+    wildSerial(String("WILD 0 0"));
+    if (battleOpen){
+      auto says=[](const char *s){ for (uint8_t i=0;i<btlMsgCount;i++) if (!strcmp(btlMsg[i],s)) return true; return false; };
+      btlWon=btlPetIn=true; btlMsgCount=0;
+      ck(wildTooEasy(pet,btlFoe.level), "(a tier-1 Kanto foe is too easy for the level 41 pet)");
+      wildBattleOver();
+      ck(btlTrainGain==0 && says(WT(W_TOO_EASY)), "a too-easy win trains nothing and the log says so");
+      btlFoe.level=pet.level(); btlMsgCount=0;
+      wildBattleOver();
+      ck(btlTrainGain>0 && !says(WT(W_TOO_EASY)), "(a level-matched win trains, with no such line)");
+      endBattle();
+    } else ck(false, "WILD 0 0 started a battle");
   }
 
   // ---- the 3 s hold is for the main screen only

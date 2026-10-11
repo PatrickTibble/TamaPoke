@@ -167,53 +167,6 @@ uint16_t wildRandomOpenArea(const Pet &p, uint8_t r) {
   return WILD_NO_AREA;
 }
 
-static bool inRegion(int16_t d, uint8_t region) {
-  return region == REGION_ALL || regionOfDex(d) == region;
-}
-
-static bool isWildBase(int16_t d, uint8_t tier) {
-  return DEX_TBL[d].rarity == tier && wildPlayable(d);
-}
-
-// Count, then pick the k-th: no candidate buffer, so REGION_ALL's few hundred
-// commons cost no stack.
-static int16_t pickTier(const RegionInfo &rg, uint8_t tier) {
-  uint16_t n = 0;
-  for (int16_t d = rg.lo; d <= rg.hi && d <= DEX_COUNT; d++) if (isWildBase(d, tier)) n++;
-  if (!n) return -1;
-  long k = random(n);
-  for (int16_t d = rg.lo; d <= rg.hi && d <= DEX_COUNT; d++)
-    if (isWildBase(d, tier) && k-- == 0) return d;
-  return -1;
-}
-
-int16_t wildEvolveFor(int16_t d, uint8_t lvl, uint8_t region) {
-  while (d >= 1 && d <= DEX_COUNT && d != DEX_EEVEE) {
-    const DexEntry &e = DEX_TBL[d];
-    if (!e.evolvesTo || lvl < e.evolveLevel) break;
-    int16_t n = (int16_t)e.evolvesTo;
-    if (!wildPlayable(n) || !inRegion(n, region) || DEX_TBL[n].rarity == R_LEGENDARIO) break;
-    d = n;
-  }
-  return d;
-}
-
-int16_t wildRoll(uint8_t region, uint8_t lvl) {
-  if (region >= REGION_COUNT || !regionAvailable(region)) return -1;
-  const RegionInfo &rg = REGIONS[region];
-  uint8_t tier = random(100) < WILD_COMMON_PCT ? R_COMUN : R_RARO;
-  int16_t d = pickTier(rg, tier);
-  if (d < 0) d = pickTier(rg, tier == R_COMUN ? R_RARO : R_COMUN);
-  return d < 0 ? -1 : wildEvolveFor(d, lvl, region);
-}
-
-uint8_t wildLevelFor(uint8_t top) {
-  int l = (int)top - (int)random(WILD_LEVEL_SPREAD + 1);
-  if (l < WILD_MIN_LEVEL) l = WILD_MIN_LEVEL;
-  if (l > MAX_LEVEL) l = MAX_LEVEL;
-  return (uint8_t)l;
-}
-
 WildRefusal wildCanStart(const Pet &p, uint8_t region) {
   if (p.isEgg()) return WILD_EGG;
   if (p.sleeping) return WILD_ASLEEP;
@@ -227,9 +180,13 @@ void wildSpend(Pet &p) {
   p.saveNow();
 }
 
-uint8_t wildReward(Pet &p, bool won, bool petFought, uint8_t &which) {
+bool wildTooEasy(const Pet &p, uint8_t foeLvl) {
+  return (int)foeLvl + WILD_REWARD_GAP < (int)p.level();
+}
+
+uint8_t wildReward(Pet &p, bool won, bool petFought, uint8_t foeLvl, uint8_t &which) {
   which = 0;
-  if (!won || !petFought) return 0;
+  if (!won || !petFought || wildTooEasy(p, foeLvl)) return 0;
   return p.rewardTraining(WILD_REWARD_MIN + random(WILD_REWARD_SPAN), which);
 }
 
@@ -277,22 +234,28 @@ uint16_t wildSeenCountIn(const Pet &p, uint8_t region) {
 static const char *const W_STRINGS[LANG_COUNT][W_COUNT] = {
   { "SALVAJE", "ZONA SALVAJE", "Un %s salvaje aparecio!", "%s +%u!",
     "Primero debe nacer", "Esta dormido", "Esta muy cansado", "Falta el pack",
-    "Ahora no", "Nv %u-%u", "Medalla %u", "Sin zona abierta" },
+    "Ahora no", "Nv %u-%u", "Medalla %u", "Sin zona abierta",
+    "Rival muy debil, no entrena" },
   { "WILD", "WILD AREA", "A wild %s appeared!", "%s +%u!",
     "Hatch it first", "It is asleep", "Too tired", "Needs pack",
-    "Not now", "Lv %u-%u", "Badge %u", "No open area" },
+    "Not now", "Lv %u-%u", "Badge %u", "No open area",
+    "Foe too weak to train" },
   { "SAUVAGE", "ZONE SAUVAGE", "Un %s sauvage apparait!", "%s +%u!",
     "Il doit eclore", "Il dort", "Trop fatigue", "Pack manquant",
-    "Pas maintenant", "Nv %u-%u", "Badge %u", "Aucune zone" },
+    "Pas maintenant", "Nv %u-%u", "Badge %u", "Aucune zone",
+    "Trop faible pour entrainer" },
   { "WILD", "WILDNIS", "Ein wildes %s erscheint!", "%s +%u!",
     "Erst ausbrueten", "Es schlaeft", "Zu muede", "Paket fehlt",
-    "Nicht jetzt", "Lv %u-%u", "Orden %u", "Kein Gebiet" },
+    "Nicht jetzt", "Lv %u-%u", "Orden %u", "Kein Gebiet",
+    "Zu schwach zum Trainieren" },
   { "SELVATICO", "ZONA SELVATICA", "Appare un %s selvatico!", "%s +%u!",
     "Deve schiudersi", "Sta dormendo", "Troppo stanco", "Manca il pack",
-    "Non ora", "Lv %u-%u", "Medaglia %u", "Nessuna zona" },
+    "Non ora", "Lv %u-%u", "Medaglia %u", "Nessuna zona",
+    "Troppo debole per allenarsi" },
   { "SELVAGEM", "ZONA SELVAGEM", "Um %s selvagem apareceu!", "%s +%u!",
     "Deve chocar antes", "Esta dormindo", "Muito cansado", "Falta o pack",
-    "Agora nao", "Nv %u-%u", "Insignia %u", "Nenhuma zona" },
+    "Agora nao", "Nv %u-%u", "Insignia %u", "Nenhuma zona",
+    "Fraco demais para treinar" },
 };
 
 const char *WT(WildStr s) {

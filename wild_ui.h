@@ -306,14 +306,18 @@ static void wildMakeRoom(uint8_t need) {
 }
 
 bool wildBattleOver() {
-  btlTrainGain = wildReward(pet, btlWon, btlPetIn, btlTrainWhich);
-  wildMakeRoom(btlTrainGain ? 2 : 1);
+  btlTrainGain = wildReward(pet, btlWon, btlPetIn, btlFoe.level, btlTrainWhich);
+  // A win that silently trains nothing reads as a bug, so say why.
+  bool tooEasy = btlWon && btlPetIn && wildTooEasy(pet, btlFoe.level);
+  wildMakeRoom(btlTrainGain || tooEasy ? 2 : 1);
   audioMusic(btlWon ? MUS_VICTORY : MUS_NONE);
   if (btlWon) sfxPlay(SFX_VICTORY);
   btlSay("%s", T(btlWon ? S_BTL_WIN : S_BTL_LOSE));
   if (btlTrainGain) {
     static const StrId NAMES[3] = { S_TR_ATK, S_TR_DEF, S_TR_SPE };
     btlSay(WT(W_GAIN), T(NAMES[btlTrainWhich % 3]), btlTrainGain);
+  } else if (tooEasy) {
+    btlSay("%s", WT(W_TOO_EASY));
   }
   return true;
 }
@@ -325,27 +329,63 @@ void wildAfterBattle() {
   wildRoute();
 }
 
-// WILD [region] -- a random open area of the region (default: the egg region),
-// fought with the current squad.
+static void wildSerialList(uint8_t r) {
+  uint16_t f = wildAreaFirst(r), n = wildAreaCount(r);
+  Serial.printf("%s: %u areas, tier %u\n", REGIONS[r].name, (unsigned)n, (unsigned)wildTier(pet, r));
+  for (uint16_t i = 0; i < n; i++) {
+    uint16_t a = f + i;
+    WildRefusal w = wildAreaWhyClosed(pet, a);
+    Serial.printf("%u %s tier=%u ", (unsigned)i, wildAreaName(a), (unsigned)wildAreaTier(a));
+    if (w == WILD_OK) {
+      uint8_t lo, hi;
+      wildAreaLevels(pet, a, lo, hi);
+      Serial.printf("open Lv %u-%u\n", (unsigned)lo, (unsigned)hi);
+    } else {
+      char why[24];
+      wildRowReason(w, wildAreaTier(a), why, sizeof(why));
+      Serial.println(why);
+    }
+  }
+}
+
+static void wildSerialRefuse(WildRefusal w, uint16_t a) {
+  char why[24];
+  wildRowReason(w, wildAreaTier(a), why, sizeof(why));
+  Serial.printf("refused: %s\n", *why ? why : "no squad");
+}
+
+// WILD AREAS [r]   list region r's areas with region-local indices
+// WILD <r> <index> fight in that area (names have spaces; the index is the handle)
+// WILD [r]         a random open area of r (default: the egg region)
+// AREAS is matched first: %d fails on it, which would leave rg at the default
+// and start a fight.
 bool wildSerial(const String &line) {
   if (!line.startsWith("WILD")) return false;
-  int rg = pet.region;
-  sscanf(line.c_str() + 4, "%d", &rg);
-  if (battleOpen) {
+  const char *s = line.c_str() + 4;
+  while (*s == ' ') s++;
+  bool list = !strncmp(s, "AREAS", 5);
+  if (list) s += 5;
+  int rg = pet.region, idx = -1;
+  bool pick = sscanf(s, "%d %d", &rg, &idx) == 2;
+  if (rg < 0 || rg >= REGION_COUNT || (pick && idx < 0)) {
+    Serial.printf("usage: WILD AREAS [r] | WILD [r] | WILD <r> <index>, r 0..%u\n", REGION_COUNT - 1);
+  } else if (list) {
+    wildSerialList((uint8_t)rg);
+  } else if (battleOpen) {
     Serial.println("already in a battle");
-  } else if (rg < 0 || rg >= REGION_COUNT) {
-    Serial.printf("usage: WILD [region 0..%u]\n", REGION_COUNT - 1);
+  } else if (pick && idx >= (int)wildAreaCount((uint8_t)rg)) {
+    Serial.printf("no area %d in %s, see WILD AREAS %d\n", idx, REGIONS[rg].name, rg);
   } else {
     WildRefusal w = wildCanStart(pet, (uint8_t)rg);
-    uint16_t a = w == WILD_OK ? wildRandomOpenArea(pet, (uint8_t)rg) : WILD_NO_AREA;
+    uint16_t a = pick ? wildAreaFirst((uint8_t)rg) + idx
+               : w == WILD_OK ? wildRandomOpenArea(pet, (uint8_t)rg) : WILD_NO_AREA;
     if (w == WILD_OK && a == WILD_NO_AREA) {
       Serial.printf("refused: %s\n", WT(W_NO_AREA));
     } else if (w == WILD_OK && (w = startWildBattle((uint8_t)rg, a)) == WILD_OK) {
       Serial.printf("wild %s Lv.%u in %s, ene=%u\n", btlFoe.name, btlFoe.level,
                     wildAreaName(a), pet.energy);
     } else {
-      const char *why = wildRefusalText(w);
-      Serial.printf("refused: %s\n", *why ? why : "no squad");
+      wildSerialRefuse(w, a);
     }
   }
   Serial.println("DONE");

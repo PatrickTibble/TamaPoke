@@ -31,10 +31,10 @@ todos:
     status: pending
   - id: p4-serial-retire
     content: Phase 4 - serial WILD AREAS [r] (parsed first) and WILD r i; retire wildRoll/wildEvolveFor/wildLevelFor/wildSquadTop/inRegion/isWildBase/pickTier, their constants and wild_test sections
-    status: pending
+    status: completed
   - id: p4-reward-gap
     content: Phase 4 - wildReward(..., foeLvl, ...) with WILD_REWARD_GAP 10, W_TOO_EASY in 6 languages, battle log line, reward gap test + negative checks for gap and serial order
-    status: pending
+    status: completed
   - id: p5-docs-verify
     content: Phase 5 - FORK.md (section 7), full run.sh, arduino-cli compile from Windows, on-board check of area row touch targets and RTC time gating
     status: pending
@@ -146,6 +146,14 @@ The rest of sections 2, 3 and 5.
 - The reward gap: `wildReward(..., foeLvl, ...)`, `WILD_REWARD_GAP 10`, `W_TOO_EASY` in six languages and the battle log line. Test both sides of the boundary, then negative-check it.
 
 **Done when** no retired symbol remains, `WILD AREAS 1` lists without starting a battle, and the suite and compile are green.
+
+**Result (2026-10-11):** `run.sh` 38/38. `arduino-cli compile` passes: sketch 1,780,747 bytes (56%, +792), globals unchanged at 66,888. `rg` for every retired name and constant is empty outside `.cursor/plans`. Four breaks were each seen to fail a test: the serial order, the gap boundary (`<` to `<=`), the gap removed from `wildReward()`, and the `W_TOO_EASY` log line removed with the gap still in place. Differences from the spec:
+
+- **`wildTooEasy(pet, foeLvl)`** is the one answer to the gap: `wildReward()` and the battle log both ask it, so the log cannot announce a reason the reward did not apply (trap 1).
+- **The first serial-order check was vacuous.** The test pet's egg region is `REGION_ALL`, which has no areas, so a misparsed `WILD AREAS 1` was refused with "No open area" and the check passed with the bug in. It now pins `pet.region` to Kanto and proves first that a bare `WILD` fights from that state.
+- The console prints a closed area's reason through `wildRowReason()`, so a refusal reads "Badge n" rather than the old fallback "no squad". An index past the region's last area, or a negative one, is refused without touching the battle.
+- `WILD` with the egg region set to ALL answers "No open area". Areas belong to a region, so there is no ALL pool to pick from. Use `WILD <r>`.
+- The battle-log check calls `wildBattleOver()` directly with a forced win: forcing a real KO through `battleTap` adds nothing the reward test does not already cover.
 
 ### Phase 5: docs and hardware
 
