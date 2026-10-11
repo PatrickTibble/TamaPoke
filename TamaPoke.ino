@@ -29,6 +29,7 @@
 #include "party.h"
 #include "save.h"
 #include "pet.h"
+#include "wild.h"  // FORK(wild)
 #include "sdmon.h"
 #include "rtcbat.h"
 #include "i18n.h"
@@ -336,9 +337,9 @@ uint8_t btlMyAct = 0;        // host: our own action, latched until theirs lands
 #define UI_TAP_MIN 44
 
 // The LAN battle button on the gym region chooser.
-#define LANBTN_W 190
+#define LANBTN_W 150             // FORK(wild): shares its row with WILD
 #define LANBTN_H UI_TAP_MIN
-#define LANBTN_X (233 - LANBTN_W / 2)
+#define LANBTN_X (233 + 6)       // FORK(wild): the right half; WILD is the left
 #define LANBTN_Y 336
 
 #define BOXBTN_X 146
@@ -686,6 +687,7 @@ void setup() {
 
   party.begin();
   pet.begin();
+  wildLoad();  // FORK(wild)
   sdBegin();
   thumbs.load();
 
@@ -855,6 +857,7 @@ void handleSerial() {
   line.trim();
   if (line.length() == 0) return;
   if (sdSerialCommand(line)) return;
+  if (wildSerial(line)) return;  // FORK(wild)
 
   if (line == "HATCH") {
     pet.eggTap(); pet.eggTap(); pet.eggTap();
@@ -1682,6 +1685,7 @@ void onTap(int16_t x, int16_t y) {
     return;
   }
   if (gymOpen && gymPick) {
+    if (wildPickOpen) { wildPickTap(x, y); return; }  // FORK(wild)
     int r = regionPickTap(x, y, RPICK_FOR_GYMS);
     if (r >= 0) {
       gymRegion = (uint8_t)r;
@@ -1690,6 +1694,7 @@ void onTap(int16_t x, int16_t y) {
       sfxPlay(SFX_TAP);
       return;
     }
+    if (wildGymTap(x, y)) return;  // FORK(wild)
     if (y >= LANBTN_Y && y <= LANBTN_Y + LANBTN_H &&
         x >= LANBTN_X && x <= LANBTN_X + LANBTN_W) {   // LAN battle
       gymOpen = false; gymPick = false;
@@ -2236,7 +2241,7 @@ void render() {
     return;
   }
   if (gymOpen) {
-    if (gymPick) renderRegionPick(RPICK_FOR_GYMS);
+    if (gymPick) renderRegionPick(wildRpickMode());  // FORK(wild)
     else renderGyms();
     return;
   }
@@ -3405,7 +3410,7 @@ void startTrainerBattle(uint8_t idx, bool hard) {
 void startBattle(int16_t dex, uint8_t lvl) {
   if (pet.isEgg() || pet.ceremony != CER_NONE) return;
   if (dex < 1 || dex > DEX_COUNT) return;
-  buildSquad(0, TRAINER_TEAM_MAX, 0xFFFF);
+  buildSquad(0, TRAINER_TEAM_MAX, btlWild ? squadMask : 0xFFFF);  // FORK(wild)
   if (!btlSquadN) return;
   // The opponent is built through Pet so it gets the same stat formula and the
   // same learnset-driven moveset the player's creature does -- no special-cased
@@ -3620,6 +3625,7 @@ static void btlResolve(uint8_t yourMove) {
     btlWon = btlFoe.fainted();
     btlNewBadge = false;
     btlTrainGain = 0;
+    if (btlWild && wildBattleOver()) return;  // FORK(wild)
     if (btlWon && btlTrainer >= 0 && !pet.hasBadge(btlRegion, btlTrainer, btlHard)) {
       pet.winBadge(btlRegion, btlTrainer, btlHard);
       btlNewBadge = true;
@@ -4026,6 +4032,7 @@ static void btlRun() {
   if (btlLink) { lanLeave(); btlLink = false; lanOpen = true; }
   battleOpen = false;
   btlMenu = 0;
+  if (btlWild) wildAfterBattle();  // FORK(wild)
 }
 
 void battleTap(int16_t x, int16_t y) {
@@ -4045,6 +4052,7 @@ void battleTap(int16_t x, int16_t y) {
       // Back to the LAN screen rather than all the way out: that is where a
       // rematch is offered, and re-pairing for every fight would be tedious.
       if (btlLink) { btlLink = false; lanOpen = true; }
+      if (btlWild) wildAfterBattle();  // FORK(wild)
       return;
     }
     if (btlSwapWho >= 0) btlDoSwap();   // the replacement arrives on this beat
@@ -4456,6 +4464,8 @@ void renderPick() {
   if (pickTrainer == PICK_LAN) {
     snprintf(head, sizeof(head), "%s: %s", T(S_LAN),
              lanWantHost ? T(S_LAN_HOST) : T(S_LAN_JOIN));
+  } else if (pickTrainer == PICK_WILD) {  // FORK(wild)
+    wildPickHead(head, sizeof(head));
   } else {
     const Trainer &t = TRAINERS[pickTrainer];
     for (int k = 0; k < t.count; k++)
@@ -4513,6 +4523,7 @@ void pickTap(int16_t x, int16_t y) {
       x >= PICK_BACK_X && x <= PICK_BACK_X + PICK_BTN_W) {   // BACK
     sfxPlay(SFX_TAP);
     pickOpen = false;
+    if (pickTrainer == PICK_WILD) { wildPickBack(); return; }  // FORK(wild)
     if (pickTrainer == PICK_LAN) { lanOpen = true; }
     else { gymOpen = true; }
     return;
@@ -4532,6 +4543,7 @@ void pickTap(int16_t x, int16_t y) {
       lanOpen = true;
       return;
     }
+    if (pickTrainer == PICK_WILD) { wildFight(); return; }  // FORK(wild)
     startTrainerBattle(pickTrainer, pickHard);
     return;
   }
@@ -4888,7 +4900,7 @@ uint8_t rpickModeNow() {
   switch (uiCurrentScreen()) {
     case SCR_REGION:  return RPICK_FOR_START;
     case SCR_DEXPICK: return RPICK_FOR_DEX;
-    case SCR_GYMPICK: return RPICK_FOR_GYMS;
+    case SCR_GYMPICK: return wildRpickMode();  // FORK(wild)
     default: return 0xFF;
   }
 }
@@ -4915,6 +4927,7 @@ static void renderRegionPick(uint8_t mode) {
   gfx->fillCircle(CX, CY, 231, UI_BG_DAY);
   char ttl[40];
   if (mode == RPICK_FOR_START) snprintf(ttl, sizeof(ttl), "%s", T(S_CHOOSE_REGION));
+  else if (mode == RPICK_FOR_WILD) snprintf(ttl, sizeof(ttl), "%s", WT(W_TITLE));  // FORK(wild)
   else if (forGyms) snprintf(ttl, sizeof(ttl), "%s", T(S_GYMS));
   else snprintf(ttl, sizeof(ttl), T(S_POKEDEX_FMT), pet.registeredCount(), DEX_COUNT);
   gfx->setTextColor(UI_INK);
@@ -4946,9 +4959,10 @@ static void renderRegionPick(uint8_t mode) {
       snprintf(sub, sizeof(sub), "%s", T(S_NEED_PACK));
     else if (mode == RPICK_FOR_GYMS)
       snprintf(sub, sizeof(sub), T(S_BADGES_FMT), pet.badgeCountIn(i, gymHard));
-    else if (mode == RPICK_FOR_DEX)
+    else if (mode == RPICK_FOR_DEX || mode == RPICK_FOR_WILD)  // FORK(wild)
       snprintf(sub, sizeof(sub), "%u/%u",
-               pet.registeredCountIn(REGIONS[i].lo, REGIONS[i].hi),
+               mode == RPICK_FOR_WILD ? wildSeenCountIn(pet, i)  // FORK(wild)
+                                      : pet.registeredCountIn(REGIONS[i].lo, REGIONS[i].hi),
                (unsigned)(REGIONS[i].hi - REGIONS[i].lo + 1));
     if (sub[0]) {
       gfx->setTextColor(UI_TRACK);
@@ -4962,9 +4976,10 @@ static void renderRegionPick(uint8_t mode) {
     gfx->drawRoundRect(LANBTN_X, LANBTN_Y, LANBTN_W, LANBTN_H, 11, UI_INK);
     gfx->setTextColor(UI_INK);
     gfx->setTextSize(2);
-    gfx->setCursor(CX - strlen(T(S_LAN)) * 6, LANBTN_Y + 14);
+    gfx->setCursor(LANBTN_X + LANBTN_W / 2 - strlen(T(S_LAN)) * 6, LANBTN_Y + 14);  // FORK(wild)
     gfx->print(T(S_LAN));
   }
+  wildDrawPick(mode);  // FORK(wild)
   if (pages > 1) {                        // dots: which page of regions this is
     int total = pages * 16 - 8;
     for (uint8_t d = 0; d < pages; d++) {
@@ -6275,3 +6290,5 @@ void drawMap(const char *const *map, int n, int x, int y, int s, bool silhouette
     }
   }
 }
+
+#include "wild_ui.h"  // FORK(wild): last, so it sees every sketch global

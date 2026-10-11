@@ -44,9 +44,28 @@ uint16_t wildSeenCountIn(const Pet &p, uint8_t region);
 // Fork-owned strings, kept out of upstream's positional STRINGS table so its
 // appends can never shift ours. ASCII only, like every firmware string.
 enum WildStr : uint8_t {
-  W_BTN, W_TITLE, W_SEEN_FMT, W_APPEARED, W_WIN, W_GAIN,
+  W_BTN, W_TITLE, W_APPEARED, W_GAIN,
   W_NO_EGG, W_NO_SLEEP, W_NO_ENERGY, W_NO_PACK,
   W_COUNT
 };
 const char *WT(WildStr s);
 const char *wildRefusalText(WildRefusal r);
+
+// ---- Sketch-only UI, defined in wild_ui.h (included at the bottom of
+// TamaPoke.ino). Declared here because the FORK(wild) hooks above that include
+// call them, and arduino-cli only auto-prototypes the .ino itself.
+#define RPICK_FOR_WILD 3     // next to RPICK_FOR_GYMS/DEX/START in the sketch
+#define PICK_WILD 0xFE       // next to PICK_LAN; squadCap() leaves it uncapped
+extern bool btlWild;         // the running fight is a wild one
+extern bool wildPickOpen;    // the gym chooser is showing its wild mode
+uint8_t wildRpickMode();
+void wildDrawPick(uint8_t mode);
+bool wildGymTap(int16_t x, int16_t y);
+void wildPickTap(int16_t x, int16_t y);
+void wildPickHead(char *out, size_t n);
+void wildPickBack();
+void wildFight();
+bool startWildBattle(uint8_t region);
+bool wildBattleOver();
+void wildAfterBattle();
+bool wildSerial(const String &line);

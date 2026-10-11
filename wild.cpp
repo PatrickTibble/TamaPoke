@@ -117,23 +117,17 @@ uint16_t wildSeenCountIn(const Pet &p, uint8_t region) {
 
 // Rows follow the Lang enum: ES, EN, FR, DE, IT, PT.
 static const char *const W_STRINGS[LANG_COUNT][W_COUNT] = {
-  { "SALVAJE", "ZONA SALVAJE", "VISTOS %u/%u", "Un %s salvaje aparecio!",
-    "El %s salvaje se debilito!", "%s +%u!",
+  { "SALVAJE", "ZONA SALVAJE", "Un %s salvaje aparecio!", "%s +%u!",
     "Primero debe nacer", "Esta dormido", "Esta muy cansado", "Falta el pack" },
-  { "WILD", "WILD AREA", "SEEN %u/%u", "A wild %s appeared!",
-    "The wild %s fainted!", "%s +%u!",
+  { "WILD", "WILD AREA", "A wild %s appeared!", "%s +%u!",
     "Hatch it first", "It is asleep", "Too tired", "Needs pack" },
-  { "SAUVAGE", "ZONE SAUVAGE", "VUS %u/%u", "Un %s sauvage apparait!",
-    "Le %s sauvage est K.O.!", "%s +%u!",
+  { "SAUVAGE", "ZONE SAUVAGE", "Un %s sauvage apparait!", "%s +%u!",
     "Il doit eclore", "Il dort", "Trop fatigue", "Pack manquant" },
-  { "WILD", "WILDNIS", "GESEHEN %u/%u", "Ein wildes %s erscheint!",
-    "Das wilde %s ist besiegt!", "%s +%u!",
+  { "WILD", "WILDNIS", "Ein wildes %s erscheint!", "%s +%u!",
     "Erst ausbrueten", "Es schlaeft", "Zu muede", "Paket fehlt" },
-  { "SELVATICO", "ZONA SELVATICA", "VISTI %u/%u", "Appare un %s selvatico!",
-    "Il %s selvatico e esausto!", "%s +%u!",
+  { "SELVATICO", "ZONA SELVATICA", "Appare un %s selvatico!", "%s +%u!",
     "Deve schiudersi", "Sta dormendo", "Troppo stanco", "Manca il pack" },
-  { "SELVAGEM", "ZONA SELVAGEM", "VISTOS %u/%u", "Um %s selvagem apareceu!",
-    "O %s selvagem desmaiou!", "%s +%u!",
+  { "SELVAGEM", "ZONA SELVAGEM", "Um %s selvagem apareceu!", "%s +%u!",
     "Deve chocar antes", "Esta dormindo", "Muito cansado", "Falta o pack" },
 };
 
