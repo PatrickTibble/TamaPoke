@@ -215,7 +215,14 @@ static void audioTask(void *) {
     }
 
     if (m == MUS_NONE) {
-      if (ampOn && !gSyn.busy()) { digitalWrite(PA, LOW); ampOn = false; }
+      // A tune stopped mid-note leaves its voices holding samples, and nothing
+      // renders on this branch: busy() never clears, the amp stays on and the
+      // I2S DMA (no auto-clear) replays its last buffer forever, which sounds
+      // like the music never stopped. Cut the music voices and push enough
+      // silence to cover the whole DMA ring (6 x 240 frames = 90 ms).
+      if (playing != MUS_NONE) { gSyn.silence(0); gSyn.silence(1); pump(120); }
+      if (gSyn.busy()) { pump(10); continue; }   // drain a tail, never spin
+      if (ampOn) { digitalWrite(PA, LOW); ampOn = false; }
       playing = MUS_NONE; mi1 = mi2 = 0; at1 = at2 = clock = 0;
       continue;
     }

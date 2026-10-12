@@ -57,6 +57,7 @@ Untagged, because the line is a list entry or a fix rather than a hook:
 - `tools/emu/tests/save_test.cpp`: marks two species seen and checks the bitmap round-trips.
 - `tools/emu/README.md`: the list of compiled sources.
 - `tools/emu/host_impl.cpp`: sprite path buffer 64 -> 512 (long repo paths lost shinies). Upstreamable as is.
+- `audio.cpp`: stopping the music silences the two music voices and flushes the I2S DMA with silence. A tune cut mid-note (running, or tapping out of the victory fanfare -- routine after a wild fight) otherwise left `busy()` set forever and the DMA looping its last buffer until power-off. Upstreamable as is; the emulator stubs audio, so only a board can confirm it.
 - `.gitattributes`: LF for `*.sh` and `*.py`, which WSL bash needs. Upstreamable as is.
 
 ## Syncing from upstream
