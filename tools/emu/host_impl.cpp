@@ -146,6 +146,7 @@ const LinkNowStats &linkNowStats() { return gNoStats; }
 // audio is silent here, but the sketch calls these, so they have to exist
 static uint8_t g_emuVol = 7, g_emuMusic = 0;
 void audioMusic(uint8_t id) { g_emuMusic = id; }
+uint8_t emuMusic() { return g_emuMusic; }   // what the sketch last asked to play, for tests
 void audioSetVolume(uint8_t v) { g_emuVol = v > 10 ? 10 : v; }
 uint8_t audioVolume() { return g_emuVol; }
 void audioSetEnabled(bool on) { (void)on; }

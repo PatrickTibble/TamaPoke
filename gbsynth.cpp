@@ -61,12 +61,16 @@ bool GbSynth::busy() const {
   return false;
 }
 
+// Master volume 0..10 as a gain on the summed voice levels, 2.5 dB a step. A
+// linear 150 * master left level 1 loud, and clipped two music voices from
+// level 8 up, so the top steps of a battle all sounded the same. Level 10 is
+// sized so both pulse voices at full level (15 + 15) just reach full scale;
+// only noise on top of both can clip, and only briefly.
+static const int16_t MASTER_GAIN[11] = { 0, 82, 109, 146, 194, 259, 345, 460, 614, 819, 1092 };
+
 void GbSynth::render(int16_t *out, size_t n, uint8_t master) {
   if (master > 10) master = 10;
-  // Headroom for three voices at once: each can reach 15, and the sum is
-  // divided so a full chord cannot clip. 1500 per unit of master keeps a single
-  // voice comfortably audible without the mix distorting.
-  const int32_t scale = (int32_t)master * 150;
+  const int32_t scale = MASTER_GAIN[master];
   for (size_t i = 0; i < n; i++) {
     int32_t mix = 0;
     for (int c = 0; c < GB_VOICES; c++) {

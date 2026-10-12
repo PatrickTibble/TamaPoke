@@ -57,7 +57,9 @@ Untagged, because the line is a list entry or a fix rather than a hook:
 - `tools/emu/tests/save_test.cpp`: marks two species seen and checks the bitmap round-trips.
 - `tools/emu/README.md`: the list of compiled sources.
 - `tools/emu/host_impl.cpp`: sprite path buffer 64 -> 512 (long repo paths lost shinies). Upstreamable as is.
-- `audio.cpp`: stopping the music silences the two music voices and flushes the I2S DMA with silence. A tune cut mid-note (running, or tapping out of the victory fanfare -- routine after a wild fight) otherwise left `busy()` set forever and the DMA looping its last buffer until power-off. Upstreamable as is; the emulator stubs audio, so only a board can confirm it.
+- `TamaPoke.ino`: `btlClose()`, the one way out of a fight (free sprites, stop the music, close). The tap after a wild or LAN result had its own copy that never called `audioMusic(MUS_NONE)`, so the 90 s victory theme played on after the battle. `wild_ui_test` asserts the music is `MUS_NONE` after leaving a won fight, through `emuMusic()` in `host_impl.cpp`. Upstreamable as is.
+- `gbsynth.cpp`: master volume is a 2.5 dB-per-step gain table (`MASTER_GAIN`) instead of linear `150 * master`, which left level 1 loud and clipped battle music from level 8 up. `synth_test` checks every step is louder, the steps are even, and two voices never clip. Upstreamable as is.
+- `audio.cpp`: stopping the music cuts its two voices, so `busy()` clears instead of spinning the task with the amp on; volume 0 keeps the amp off (its turn-on click is the one sound the volume cannot scale); the amp is held on 1.5 s between sounds so a run of taps does not click each time; the dead `playTone()`, which had its own linear volume rule, is gone. Upstreamable as is; the emulator stubs audio, so only a board can confirm it.
 - `.gitattributes`: LF for `*.sh` and `*.py`, which WSL bash needs. Upstreamable as is.
 
 ## Syncing from upstream

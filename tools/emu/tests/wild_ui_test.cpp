@@ -10,6 +10,7 @@
 #include "wild.h"
 #include "battle.h"
 #include "i18n.h"
+#include "audio.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -26,6 +27,7 @@ void onTap(int16_t,int16_t); void onSwipe(int);
 uint8_t uiCurrentScreen(); uint8_t rpickModeNow();
 uint8_t rpickRegions(uint8_t); uint8_t rpickPageCount(uint8_t);
 extern const char *const SCREEN_NAME[];
+uint8_t emuMusic();
 extern Arduino_Canvas *gfx;
 extern Pet pet;
 extern bool gymOpen, gymPick, pickOpen, battleOpen, btlOver;
@@ -340,6 +342,21 @@ int main(){
       wildBattleOver();
       ck(btlTrainGain>0 && !says(WT(W_TOO_EASY)), "(a level-matched win trains, with no such line)");
       endBattle();
+    } else ck(false, "WILD 0 0 started a battle");
+  }
+
+  // ---- leaving a won fight stops the victory theme (90 s long, it played on)
+  {
+    allBadges(0); fit(80); reset();
+    wildSerial(String("WILD 0 0"));
+    if (battleOpen){
+      ck(emuMusic()==MUS_BATTLE, "(a wild battle starts its music)");
+      btlOver=btlWon=true; btlMsgCount=0;
+      wildBattleOver();
+      ck(emuMusic()==MUS_VICTORY && btlMsgCount>0, "(a win switches to the victory theme and says so)");
+      onTap(233,233);
+      ck(!battleOpen && on("gympick"), "(the tap after the result leaves the fight)");
+      ck(emuMusic()==MUS_NONE, "and leaving the fight stops the music");
     } else ck(false, "WILD 0 0 started a battle");
   }
 

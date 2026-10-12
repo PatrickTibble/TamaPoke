@@ -4027,30 +4027,34 @@ static bool btlBackTap(int16_t x, int16_t y) {
 // Running. A gym leader keeps their badge and the fight simply ends; against
 // another device the peer is told, so it does not sit waiting for a move that
 // will never come.
-static void btlRun() {
-  sfxPlay(SFX_DENY);
+// Every way out of a fight closes it here. The tap after a wild or LAN result
+// had its own copy that never stopped the music, so the 90 s victory theme
+// played on long after the battle screen was gone.
+static void btlClose() {
   btlFreeSprites();
   audioMusic(MUS_NONE);
-  if (btlLink) { lanLeave(); btlLink = false; lanOpen = true; }
   battleOpen = false;
   btlMenu = 0;
+}
+
+static void btlRun() {
+  sfxPlay(SFX_DENY);
+  if (btlLink) { lanLeave(); btlLink = false; lanOpen = true; }
+  btlClose();
   if (btlWild) wildAfterBattle();  // FORK(wild)
 }
 
 void battleTap(int16_t x, int16_t y) {
   if (btlWinUntil) {          // dismiss the win screen and leave the fight
     btlWinUntil = 0;
-    btlFreeSprites();
-    audioMusic(MUS_NONE);
-    battleOpen = false;
+    btlClose();
     if (btlLink) { btlLink = false; lanOpen = true; }
     return;
   }
   if (btlMsgCount) {          // a tap clears the narration and returns the menu
     btlMsgCount = 0;
     if (btlOver) {
-      btlFreeSprites();
-      battleOpen = false;
+      btlClose();
       // Back to the LAN screen rather than all the way out: that is where a
       // rematch is offered, and re-pairing for every fight would be tedious.
       if (btlLink) { btlLink = false; lanOpen = true; }
