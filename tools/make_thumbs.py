@@ -42,7 +42,7 @@ def read_pmd_idle_frame0(path):
         if aid == 0:     # PMD_IDLE
             return w, h, pal, buf[p:p + w * h]  # frame 0
         p += w * h * nf
-    raise ValueError('sin accion Idle (id 0)')
+    raise ValueError('no Idle action (id 0)')
 
 
 def shrink(w, h, pal, data):
@@ -87,7 +87,7 @@ def main():
         w, h, pal, data = read_pmd_idle_frame0(path)
         nw, nh, npal, ndata = shrink(w, h, pal, data)
         if len(npal) > 255:
-            raise ValueError(f'{dex}: paleta {len(npal)}')
+            raise ValueError(f'{dex}: palette {len(npal)}')
         blob = struct.pack('<3B', nw, nh, len(npal))
         blob += struct.pack(f'<{len(npal)}H', *npal)
         blob += ndata
@@ -111,7 +111,7 @@ def main():
         f.write(struct.pack('<%dI' % DEX_COUNT, *offsets))
         for b in blobs:
             f.write(b)
-    print(f"guardado {out}: {pos / 1024:.0f} KB, {len(blobs)} miniaturas")
+    print(f"wrote {out}: {pos / 1024:.0f} KB, {len(blobs)} thumbnails")
 
 
 if __name__ == '__main__':

@@ -73,7 +73,7 @@ def main():
             row.append(str(int(m * 10)))
         out.append("  { %s },  // %s\n" % (", ".join(f"{v:>2}" for v in row), atk))
     out.append("};\n\n")
-    print(f"tabla de tipos: {len(TYPE_ORDER)}x{len(TYPE_ORDER)}, {nonneutral} celdas no neutras")
+    print(f"type chart: {len(TYPE_ORDER)}x{len(TYPE_ORDER)}, {nonneutral} non-neutral cells")
     out.append(
         "// rareza: 0 = solo por evolucion, 1 = comun, 2 = raro, 3 = legendario\n"
         "enum : uint8_t { R_EVO = 0, R_COMUN, R_RARO, R_LEGENDARIO };\n\n"
@@ -146,11 +146,11 @@ def main():
     out.append("};\n")
     from collections import Counter
     c = Counter(rarities)
-    print(f"bases: {c['R_COMUN']} comunes, {c['R_RARO']} raras, {c['R_LEGENDARIO']} legendarias, {c['R_EVO']} solo-evolucion")
+    print(f"bases: {c['R_COMUN']} common, {c['R_RARO']} rare, {c['R_LEGENDARIO']} legendary, {c['R_EVO']} evolution-only")
 
     path = os.path.join(os.path.dirname(__file__), '..', 'dex.h')
     open(path, 'w').write(''.join(out))
-    print(f"guardado {os.path.normpath(path)} ({len(DEX)} especies)")
+    print(f"wrote {os.path.normpath(path)} ({len(DEX)} species)")
 
 
 if __name__ == '__main__':

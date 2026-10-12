@@ -106,7 +106,7 @@ def pack(dexnum, shiny=False):
     folder = os.path.join(CACHE, f'{dexnum:04d}{"s" if shiny else ""}')
     base = f'{BASE}/{dexnum:04d}{sub}'
     if not fetch(f'{base}/AnimData.xml', os.path.join(folder, 'AnimData.xml')):
-        raise RuntimeError('sin AnimData.xml')
+        raise RuntimeError('no AnimData.xml')
     anims = load_animdata(folder)
 
     colmap, pal = {}, []
@@ -143,7 +143,7 @@ def pack(dexnum, shiny=False):
         packed.append((aid, fw, fh, nf, ms, bytes(data)))
 
     if not any(p[0] == 0 for p in packed):
-        raise RuntimeError('sin Idle')
+        raise RuntimeError('no Idle')
 
     os.makedirs(OUT, exist_ok=True)
     path = os.path.join(OUT, f'p{"s" if shiny else ""}{dexnum:03d}.bin')
@@ -157,8 +157,8 @@ def pack(dexnum, shiny=False):
             f.write(struct.pack(f'<{nf}H', *ms))
             f.write(data)
     kb = os.path.getsize(path) / 1024
-    print(f"  -> p{'s' if shiny else ''}{dexnum:03d}.bin: {len(packed)} acciones, "
-          f"{len(pal)} colores, {kb:.0f} KB")
+    print(f"  -> p{'s' if shiny else ''}{dexnum:03d}.bin: {len(packed)} actions, "
+          f"{len(pal)} colours, {kb:.0f} KB")
 
 
 if __name__ == '__main__':
@@ -188,6 +188,6 @@ if __name__ == '__main__':
                 print(f"#{n:03d}{' shiny' if sh else ''}")
                 pack(n, sh)
             except Exception as e:
-                print(f"  FALLO: {e}")
+                print(f"  FAILED: {e}")
                 fallos.append((n, sh))
-    print(f"FALLOS: {fallos}" if fallos else "TODOS EMPAQUETADOS")
+    print(f"FAILED: {fallos}" if fallos else "ALL PACKED")

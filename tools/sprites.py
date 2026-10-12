@@ -518,11 +518,11 @@ def validate():
         n = len(rows)
         for i, row in enumerate(rows):
             if len(row) != n:
-                print(f"{name} fila {i}: {len(row)} chars (esperaba {n})")
+                print(f"{name} row {i}: {len(row)} chars (expected {n})")
                 ok = False
             bad = set(row) - set(PALETTE) - {'.'}
             if bad:
-                print(f"{name} fila {i}: chars desconocidos {bad}")
+                print(f"{name} row {i}: unknown chars {bad}")
                 ok = False
     return ok
 
@@ -551,7 +551,7 @@ def render(path="tools/sheet.png", scale=10, percol=3):
                                     fill=PALETTE[ch])
             d.text((ox, oy + H * scale + 3), name, fill='#000')
     img.save(path)
-    print(f"guardado {path}")
+    print(f"wrote {path}")
 
 
 def rgb565(hexcol):
@@ -634,7 +634,7 @@ def emit_c(path="species.h"):
     out.append("static const int8_t STARTERS[] = { SP_CHARMANDER, SP_BULBASAUR, SP_SQUIRTLE };\n")
     out.append("#define NUM_STARTERS 3\n")
     open(path, 'w').write(''.join(out))
-    print(f"guardado {path}")
+    print(f"wrote {path}")
 
 
 def emit_js(path="tools/emitted_sprites.js"):
@@ -655,13 +655,13 @@ def emit_js(path="tools/emitted_sprites.js"):
         }
     data = {'palette': PALETTE, 'sprites': SPRITES, 'meta': meta, 'order': ids}
     open(path, 'w').write("const SPRITE_DATA=" + json.dumps(data, separators=(',', ':')) + ";\n")
-    print(f"guardado {path}")
+    print(f"wrote {path}")
 
 
 if __name__ == '__main__':
     import sys
     if not validate():
-        print("-- errores de validacion --")
+        print("-- validation errors --")
         sys.exit(1)
     render()
     if 'emit' in sys.argv:

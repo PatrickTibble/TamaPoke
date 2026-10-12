@@ -3,7 +3,7 @@
 import glob, serial
 port = glob.glob('/dev/cu.usbmodem*')[0]
 ser = serial.Serial(port, 115200, timeout=1)
-print(f"escuchando {port}... toca la pantalla (Ctrl-C para salir)")
+print(f"listening on {port}... touch the screen (Ctrl-C to quit)")
 try:
     while True:
         line = ser.readline().decode(errors='replace').strip()

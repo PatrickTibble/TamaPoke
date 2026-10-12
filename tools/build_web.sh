@@ -5,11 +5,11 @@ set -e
 cd "$(dirname "$0")/.."
 FQBN="esp32:esp32:esp32s3:CDCOnBoot=cdc,FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB"
 
-echo "Compilando..."
+echo "Compiling..."
 arduino-cli compile --fqbn "$FQBN" --export-binaries .
 
 B=build/esp32.esp32.esp32s3
-echo "Fusionando binarios..."
+echo "Merging binaries..."
 # esptool is not on PATH; the Arduino core ships one and that is the version
 # that matches the build we just made.
 ESPTOOL="$(ls ~/Library/Arduino15/packages/esp32/tools/esptool_py/*/esptool 2>/dev/null | head -1)"
@@ -80,5 +80,5 @@ PYEOF
 echo "Checking the installer cannot erase a save..."
 python3 tools/check_installer.py || { echo "installer would wipe saves -- refusing"; exit 1; }
 
-echo "Empaquetando sprites..."
+echo "Packing sprites..."
 python3 tools/pack_bundle.py

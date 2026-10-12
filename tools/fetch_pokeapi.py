@@ -175,13 +175,13 @@ def main():
 
     total = sum(len(v) for v in learn.values())
     thin = [n for n in learn if len(learn[n]) < 4]
-    print('stats: %d especies x 6' % len(stats))
-    print('learnsets: %d filas, %.1f de media' % (total, total / DEX_COUNT))
+    print('stats: %d species x 6' % len(stats))
+    print('learnsets: %d rows, %.1f on average' % (total, total / DEX_COUNT))
     if missing:
-        print('AVISO: %d movimientos que nadie aprende: %s'
+        print('WARNING: %d moves nobody learns: %s'
               % (len(missing), ', '.join(sorted(missing))))
     if thin:
-        print('AVISO: %d especies con menos de 4 movimientos: %s'
+        print('WARNING: %d species with fewer than 4 moves: %s'
               % (len(thin), thin))
 
 
