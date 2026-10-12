@@ -20,12 +20,14 @@ this file is where the fork documents itself.
 - **Nothing positional is shared with upstream.** Strings live in the fork's own
   `W_STRINGS` table in `wild.cpp`, never in `i18n.cpp`'s positional `STRINGS`.
   The one NVS key is prefixed (`w_seen`). The `SCR_` enum is unchanged.
-- **`FW_VERSION` is upstream's version plus a fork patch number** (`3.11.1` is
-  upstream 3.11 with this fork). On each upstream merge, take upstream's value and
-  re-append the patch number; the line is tagged `FORK(wild)` so the conflict is
-  expected. It is display-only (boot log, settings): the LAN hello compares
-  `LINK_PROTO` and a table fingerprint, never `FW_VERSION`, and the fork adds no
-  moves and no species, so LAN battles against upstream boards still work.
+- **`FW_VERSION` is the fork's own version** (`3.12.0`), no longer derived from
+  upstream's. On an upstream merge keep the fork's line (tagged `FORK(wild)`, so the
+  conflict is expected) and bump it when the fork releases. `web/manifest.json`
+  carries the same number: `tools/build_web.ps1` and `build_web.sh` both copy it
+  from `FW_VERSION`, and the installer page shows it. It is display-only (boot log,
+  settings, installer): the LAN hello compares `LINK_PROTO` and a table
+  fingerprint, never `FW_VERSION`, and the fork adds no moves and no species, so
+  LAN battles against upstream 3.11.x boards still work.
 - **The README badge and the `web/` binaries are left alone**: they conflict on
   every upstream release. Rebuild `web/firmware/` locally to flash, never commit it.
 
@@ -310,6 +312,15 @@ builds:
 ```powershell
 & "$env:LOCALAPPDATA\Programs\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe" `
   compile --fqbn "esp32:esp32:esp32s3:CDCOnBoot=cdc,FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB" .
+```
+
+To rebuild what `web/index.html` installs (the four firmware parts and
+`manifest.json`, checked by `check_installer.py`), the Windows counterpart of
+`build_web.sh`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build_web.ps1            # firmware only
+powershell -ExecutionPolicy Bypass -File tools\build_web.ps1 -Sprites   # also repack sprites-<region>.pak
 ```
 
 - `wild_test`: the logic against the real table -- coverage, tiers, rolls, the
