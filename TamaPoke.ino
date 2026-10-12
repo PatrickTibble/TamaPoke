@@ -1100,6 +1100,11 @@ void handleSerial() {
     touchTrace = !touchTrace;
     Serial.printf("touch trace %s (panel %dx%d, chip %ux%u)\n", touchTrace ? "ON" : "OFF",
                   LCD_WIDTH, LCD_HEIGHT, touch.getResolutionX(), touch.getResolutionY());
+  } else if (line == "TOUCHRESET") {
+    // The chip re-baselines on reset: anything on the glass right now is taken as "no touch".
+    touch.reset();
+    wasPressed = false;
+    Serial.println("touch chip reset -- keep fingers off the glass for 1 s");
   } else if (line == "STATS") {
     Serial.printf("spec=%d lvl=%u food=%u joy=%u ene=%u hyg=%u miss=%u sd=%d mon=%d bat=%d usb=%d rtc=%u\n",
                   pet.speciesId, pet.level(), pet.fullness, pet.joy, pet.energy,
