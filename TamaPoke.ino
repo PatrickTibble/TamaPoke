@@ -642,6 +642,7 @@ int16_t tX0, tY0, tXl, tYl; // gesto en curso (inicio y ultima posicion)
 uint32_t tStart = 0;
 bool holdFired = false;
 bool touchTrace = false;    // TOUCH on the console: print every gesture's coordinates
+uint8_t tMaxPts = 0;        // most points the chip reported during the gesture (>1 = a ghost touch)
 
 void setup() {
   Serial.setRxBufferSize(8192);  // la transferencia a SD llega en bloques de 2 KB
@@ -1097,7 +1098,8 @@ void handleSerial() {
     Serial.println("DONE");
   } else if (line == "TOUCH") {
     touchTrace = !touchTrace;
-    Serial.printf("touch trace %s (panel %dx%d)\n", touchTrace ? "ON" : "OFF", LCD_WIDTH, LCD_HEIGHT);
+    Serial.printf("touch trace %s (panel %dx%d, chip %ux%u)\n", touchTrace ? "ON" : "OFF",
+                  LCD_WIDTH, LCD_HEIGHT, touch.getResolutionX(), touch.getResolutionY());
   } else if (line == "STATS") {
     Serial.printf("spec=%d lvl=%u food=%u joy=%u ene=%u hyg=%u miss=%u sd=%d mon=%d bat=%d usb=%d rtc=%u\n",
                   pet.speciesId, pet.level(), pet.fullness, pet.joy, pet.energy,
@@ -1134,7 +1136,9 @@ void handleTouch() {
   if (!gTouchIrq && !wasPressed) return;
   gTouchIrq = false;
   int16_t x, y;
-  bool pressed = touch.getPoint(&x, &y, 1) > 0;
+  uint8_t pts = touch.getPoint(&x, &y, 1);
+  bool pressed = pts > 0;
+  if (pts > tMaxPts) tMaxPts = pts;
 
   // saco de entrenamiento: cada toque cuenta al instante (aporrear rapido)
   if (sackOpen) {
@@ -1188,8 +1192,9 @@ void handleTouch() {
       else if (dt < 1500 && abs(dx) < 40 && abs(dy) < 40) { kind = "tap"; onTap(tX0, tY0); }
     }
     if (touchTrace)
-      Serial.printf("TOUCH %s from=%d,%d to=%d,%d dt=%lu screen=%s\n", kind, tX0, tY0,
-                    tXl, tYl, (unsigned long)dt, SCREEN_NAME[scr % SCR_COUNT]);
+      Serial.printf("TOUCH %s from=%d,%d to=%d,%d dt=%lu pts=%u screen=%s\n", kind, tX0, tY0,
+                    tXl, tYl, (unsigned long)dt, tMaxPts, SCREEN_NAME[scr % SCR_COUNT]);
+    tMaxPts = 0;
   }
   wasPressed = pressed;
 }
