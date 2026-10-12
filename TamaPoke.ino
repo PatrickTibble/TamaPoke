@@ -641,6 +641,7 @@ uint32_t choiceUntil = 0;   // se cierra solo a este millis
 int16_t tX0, tY0, tXl, tYl; // gesto en curso (inicio y ultima posicion)
 uint32_t tStart = 0;
 bool holdFired = false;
+bool touchTrace = false;    // TOUCH on the console: print every gesture's coordinates
 
 void setup() {
   Serial.setRxBufferSize(8192);  // la transferencia a SD llega en bloques de 2 KB
@@ -666,7 +667,7 @@ void setup() {
 
   // QSPI a 80MHz (por defecto 40): el flush del framebuffer es el cuello de
   // botella del fps (~56ms a 40MHz). Si el panel mostrara basura, bajar a 40M.
-  if (!gfx->begin(80000000)) Serial.println("gfx->begin() fallo");
+  if (!gfx->begin(80000000)) Serial.println("gfx->begin() failed");
   panel->setBrightness(180);
 
   touch.setPins(TP_RESET, TP_INT);
@@ -675,7 +676,7 @@ void setup() {
     touchOk = touch.begin(Wire, 0x5A, IIC_SDA, IIC_SCL);
     if (!touchOk) delay(150);
   }
-  if (!touchOk) Serial.println("CST9217 no detectado");
+  if (!touchOk) Serial.println("CST9217 not detected");
   // begin() deja el chip en modo comando (lee la identidad y no sale);
   // hace falta un reset por hardware para que vuelva a reportar toques
   touch.reset();
@@ -699,7 +700,7 @@ void setup() {
   if (e == 0) {
     rtcSetEpoch(1767225600UL);  // RTC virgen: semilla (la hora absoluta da igual,
     e = rtcEpoch();             // solo importan las diferencias)
-    Serial.println("RTC sin hora: sembrado, sin progresion offline esta vez");
+    Serial.println("RTC had no time: seeded, no offline progression this boot");
   }
   pet.syncClock(e);
 
@@ -867,7 +868,7 @@ void handleSerial() {
     if (n >= 1 && n <= DEX_COUNT) {
       pet.prevSpeciesId = pet.speciesId;
       pet.speciesId = n;
-      Serial.printf("especie #%d %s\n", n, DEX_TBL[n].name);
+      Serial.printf("species #%d %s\n", n, DEX_TBL[n].name);
     }
     Serial.println("DONE");
   } else if (line.startsWith("LVL ")) {
@@ -881,7 +882,7 @@ void handleSerial() {
     pet.saveNow();
     Serial.printf("lvl=%u\n", pet.level());
   } else if (line.startsWith("MISS ")) {
-    // MISS <n>: sets the care mistakes -- "descuidos", the desc= on STATS.
+    // MISS <n>: sets the care mistakes, the miss= on STATS.
     // Each one pushes every evolution threshold up a level, so a creature that
     // was neglected early evolves late; MISS 0 forgives that. Its sibling
     // commands are IV, TR and LVL.
@@ -890,7 +891,7 @@ void handleSerial() {
     if (m > 255) m = 255;
     pet.careMistakes = (uint8_t)m;
     pet.saveNow();
-    Serial.printf("desc=%u\n", pet.careMistakes);
+    Serial.printf("miss=%u\n", pet.careMistakes);
   } else if (line.startsWith("TR ")) {
     // TR <atk> <def> <spe>: sets the TRAINING (this game's EVs), for testing a
     // fully-raised creature without playing the minigames for an hour. Each is
@@ -905,7 +906,7 @@ void handleSerial() {
       pet.trSpe = (uint8_t)(e < 0 ? 0 : (e > pet.trMaxSpe() ? pet.trMaxSpe() : e));
       pet.saveNow();
     }
-    Serial.printf("tr=%u/%u/%u topes=%u/%u/%u\n", pet.trAtk, pet.trDef, pet.trSpe,
+    Serial.printf("tr=%u/%u/%u caps=%u/%u/%u\n", pet.trAtk, pet.trDef, pet.trSpe,
                   pet.trMaxAtk(), pet.trMaxDef(), pet.trMaxSpe());
   } else if (line.startsWith("IV ")) {
     // IV <fue> <def> <vel> <vit>: fija los valores individuales (pruebas).
@@ -923,7 +924,7 @@ void handleSerial() {
       if (pet.trSpe > pet.trMaxSpe()) pet.trSpe = pet.trMaxSpe();
     }
     pet.saveNow();   // IV used to change RAM only and never write
-    Serial.printf("iv=%u/%u/%u/%u topes=%u/%u/%u\n", pet.ivAtk, pet.ivDef,
+    Serial.printf("iv=%u/%u/%u/%u caps=%u/%u/%u\n", pet.ivAtk, pet.ivDef,
                   pet.ivSpe, pet.ivHp, pet.trMaxAtk(), pet.trMaxDef(), pet.trMaxSpe());
     Serial.println("DONE");
   } else if (line.startsWith("TIME ")) {
@@ -974,7 +975,7 @@ void handleSerial() {
       startBattle(dex, lvl > 0 ? (uint8_t)lvl : pet.level());
       Serial.printf("battle vs %s Lv.%u\n", DEX_TBL[dex].name, btlFoe.level);
     } else {
-      Serial.println("uso: BATTLE <dex> [nivel]");
+      Serial.println("usage: BATTLE <dex> [level]");
     }
     Serial.println("DONE");
   } else if (line == "SHINY") {  // alterna shiny del actual (pruebas)
@@ -1074,7 +1075,7 @@ void handleSerial() {
     for (int i = 0; i < PARTY_SLOTS; i++) {
       const PartyMon &m = party.slots[i];
       if (m.empty()) Serial.print(" -");
-      else Serial.printf(" %s%s(nv%u)", DEX_TBL[m.dex].name, m.shiny ? "*" : "", m.level);
+      else Serial.printf(" %s%s(lv%u)", DEX_TBL[m.dex].name, m.shiny ? "*" : "", m.level);
     }
     Serial.println();
     Serial.println("DONE");
@@ -1094,15 +1095,18 @@ void handleSerial() {
                   SCREEN_NAME[uiCurrentScreen() % SCR_COUNT],
                   btlPmd[0].loaded ? 1 : 0, btlPmd[1].loaded ? 1 : 0);
     Serial.println("DONE");
+  } else if (line == "TOUCH") {
+    touchTrace = !touchTrace;
+    Serial.printf("touch trace %s (panel %dx%d)\n", touchTrace ? "ON" : "OFF", LCD_WIDTH, LCD_HEIGHT);
   } else if (line == "STATS") {
-    Serial.printf("spec=%d nv=%u com=%u fel=%u ene=%u lim=%u desc=%u sd=%d mon=%d bat=%d usb=%d rtc=%u\n",
+    Serial.printf("spec=%d lvl=%u food=%u joy=%u ene=%u hyg=%u miss=%u sd=%d mon=%d bat=%d usb=%d rtc=%u\n",
                   pet.speciesId, pet.level(), pet.fullness, pet.joy, pet.energy,
                   pet.hygiene, pet.careMistakes, sdReady, mon.loaded,
                   batPercent(), usbPresent(), rtcEpoch());
-    Serial.printf("peso=%u fue=%u def=%u vel=%u vit=%u baya=%d\n",
+    Serial.printf("wt=%u atk=%u def=%u spe=%u hp=%u berry=%d\n",
                   pet.weight, pet.atkStat(), pet.defStat(), pet.speStat(),
                   pet.vitStat(), pet.berryKnown);
-    Serial.printf("iv=%u/%u/%u/%u tr=%u/%u/%u topes=%u/%u/%u\n",
+    Serial.printf("iv=%u/%u/%u/%u tr=%u/%u/%u caps=%u/%u/%u\n",
                   pet.ivAtk, pet.ivDef, pet.ivSpe, pet.ivHp,
                   pet.trAtk, pet.trDef, pet.trSpe,
                   pet.trMaxAtk(), pet.trMaxDef(), pet.trMaxSpe());
@@ -1176,11 +1180,16 @@ void handleTouch() {
     lastInteract = millis();
     int dx = tXl - tX0, dy = tYl - tY0;
     uint32_t dt = millis() - tStart;
+    const char *kind = "ignored";
+    uint8_t scr = uiCurrentScreen();
     if (!holdFired && !swallowGesture) {
-      if (abs(dx) > 80 && abs(dy) < 70 && dt < 800) onSwipe(dx > 0 ? 1 : -1);
-      else if (abs(dy) > 80 && abs(dx) < 70 && dt < 800) onSwipeV(dy > 0 ? 1 : -1);
-      else if (dt < 1500 && abs(dx) < 40 && abs(dy) < 40) onTap(tX0, tY0);
+      if (abs(dx) > 80 && abs(dy) < 70 && dt < 800) { kind = "swipeH"; onSwipe(dx > 0 ? 1 : -1); }
+      else if (abs(dy) > 80 && abs(dx) < 70 && dt < 800) { kind = "swipeV"; onSwipeV(dy > 0 ? 1 : -1); }
+      else if (dt < 1500 && abs(dx) < 40 && abs(dy) < 40) { kind = "tap"; onTap(tX0, tY0); }
     }
+    if (touchTrace)
+      Serial.printf("TOUCH %s from=%d,%d to=%d,%d dt=%lu screen=%s\n", kind, tX0, tY0,
+                    tXl, tYl, (unsigned long)dt, SCREEN_NAME[scr % SCR_COUNT]);
   }
   wasPressed = pressed;
 }
