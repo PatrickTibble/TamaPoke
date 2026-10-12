@@ -4,16 +4,39 @@
 #   powershell -ExecutionPolicy Bypass -File tools\build_web.ps1            # firmware only
 #   powershell -ExecutionPolicy Bypass -File tools\build_web.ps1 -Sprites   # also repack sprites-<region>.pak
 #   powershell -ExecutionPolicy Bypass -File tools\build_web.ps1 -SkipCheck # skip check_installer.py (not advised)
-param([switch]$Sprites, [switch]$SkipCheck)
+#   powershell -ExecutionPolicy Bypass -File tools\build_web.ps1 -Serve     # build, then serve web\ and open the installer
+#   powershell -ExecutionPolicy Bypass -File tools\build_web.ps1 -ServeOnly # just serve web\ (no rebuild)
+param([switch]$Sprites, [switch]$SkipCheck, [switch]$Serve, [switch]$ServeOnly, [int]$Port = 8000)
 
 $ErrorActionPreference = 'Stop'
-Set-Location (Split-Path -Parent $PSScriptRoot)
+$Root = Split-Path -Parent $PSScriptRoot
+Set-Location $Root
 
 $FQBN = 'esp32:esp32:esp32s3:CDCOnBoot=cdc,FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB'
 $B = 'build\esp32.esp32.esp32s3'
 $FW = 'web\firmware'
 
 function Fail($msg) { Write-Host "ERROR: $msg" -ForegroundColor Red; exit 1 }
+
+# --- python, for the save-safety check, the sprite packer and the local server
+$py = $null; $pyArgs = @()
+if (Get-Command py -ErrorAction SilentlyContinue) { $py = 'py'; $pyArgs = @('-3') }
+elseif (Get-Command python -ErrorAction SilentlyContinue) { $py = 'python' }
+
+# The page fetches manifest.json relative to itself, so the server's root MUST be
+# web\. It is passed as an absolute --directory: an admin console opens in
+# System32, where a "cd web" fails and the server would serve the wrong folder.
+function Serve-Web {
+  if (-not $py) { Fail 'Python not found (py or python); it serves web\ for the installer.' }
+  $web = Join-Path $Root 'web'
+  if (-not (Test-Path (Join-Path $web 'manifest.json'))) { Fail "no manifest.json in $web" }
+  $url = "http://localhost:$Port/"
+  Write-Host "Serving $web at $url (Ctrl+C to stop). Web Serial needs localhost or HTTPS." -ForegroundColor Green
+  Start-Job { Start-Sleep -Seconds 1; Start-Process $using:url } | Out-Null
+  & $py @pyArgs -m http.server $Port --bind localhost --directory $web
+  exit $LASTEXITCODE
+}
+if ($ServeOnly) { Serve-Web }
 function Run($exe, [string[]]$argv, $what) {
   & $exe @argv
   if ($LASTEXITCODE -ne 0) { Fail "$what failed (exit $LASTEXITCODE)" }
@@ -114,11 +137,6 @@ if ($esptool) {
   Write-Warning "esptool not found; $FW\tamapoke.bin not rebuilt (the installer does not use it)"
 }
 
-# --- python, for the save-safety check and the sprite packer
-$py = $null; $pyArgs = @()
-if (Get-Command py -ErrorAction SilentlyContinue) { $py = 'py'; $pyArgs = @('-3') }
-elseif (Get-Command python -ErrorAction SilentlyContinue) { $py = 'python' }
-
 if ($SkipCheck) {
   Write-Warning 'check_installer.py skipped (-SkipCheck)'
 } else {
@@ -135,5 +153,6 @@ if ($Sprites) {
 
 Write-Host ''
 Write-Host "Built TamaPoke v$ver for web\index.html." -ForegroundColor Green
-Write-Host 'Serve it locally (Web Serial needs localhost or HTTPS):'
-Write-Host '  cd web; py -m http.server 8000   then open http://localhost:8000/'
+if ($Serve) { Serve-Web }
+Write-Host 'To install from it, serve web\ (Web Serial needs localhost or HTTPS):'
+Write-Host '  powershell -ExecutionPolicy Bypass -File tools\build_web.ps1 -ServeOnly'

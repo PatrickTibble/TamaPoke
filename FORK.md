@@ -324,7 +324,13 @@ To rebuild what `web/index.html` installs (the four firmware parts and
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools\build_web.ps1            # firmware only
 powershell -ExecutionPolicy Bypass -File tools\build_web.ps1 -Sprites   # also repack sprites-<region>.pak
+powershell -ExecutionPolicy Bypass -File tools\build_web.ps1 -Serve     # build, then serve web\ and open the installer
+powershell -ExecutionPolicy Bypass -File tools\build_web.ps1 -ServeOnly # just serve web\
 ```
+
+The server's root must be `web\` (the page fetches `manifest.json` relative to
+itself); the script passes it as an absolute `--directory`, so it works from any
+console, including an admin one that starts in `System32`.
 
 - `wild_test`: the logic against the real table -- coverage, tiers, rolls, the
   clamp, per-slot and time gating, weights, ownership, dedupe, packs, table
