@@ -39,6 +39,3 @@ tamapoke.nvs
 tamapoke.nvs.*
 tools/_*.svg
 backups/
-web/firmware/tamapoke.bin
-web/firmware/bootloader.bin
-web/firmware/app.bin
