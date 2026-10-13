@@ -41,6 +41,12 @@ const CARDS = {
     ['🎯', 'Speed', 'Reaction test'],
     ['⚽', 'Defense', 'Ball game'],
   ],
+  wild: [
+    ['👈', 'Swipe left, tap WILD', 'It sits next to LAN BATTLE on the gym list.'],
+    ['🗺️', 'Pick a region', 'It shows how many creatures you have seen there.'],
+    ['🌳', 'Pick a place', 'Swipe for more. Locked places show the badge they need.'],
+    ['⚔️', 'Pick your team & fight', 'Bring anyone from your team. Tap RUN to get away.'],
+  ],
 };
 
 const LISTS = {
@@ -61,8 +67,15 @@ const LISTS = {
     'Too easy? Try <b>hard mode</b>.',
     '<b>Battle a friend:</b> on the gym list, tap <b>LAN BATTLE</b>. One of you taps HOST and the other taps JOIN.',
   ],
+  wild: [
+    'Every badge opens <b>new places</b> with stronger creatures.',
+    'Some creatures only come out in the <b>morning</b> or at <b>night</b>.',
+    'Each fight uses some <b>energy</b>. Your creature can\'t go while tired, asleep or still an egg.',
+    'Win to <b>train</b> your creature. Foes 10+ levels weaker teach it nothing.',
+  ],
   collect: [
     'Over <b>800</b> creatures to raise, plus rare <b>shiny</b> colours.',
+    'Open the <b>Pokedex</b> from the menu, pick a region and see everyone you have raised.',
     'Every ending brings a new egg. Tap the <b>region</b> under it to choose where it comes from.',
     'Old friends wait in your <b>team</b> (6) and <b>box</b> (18).',
   ],
@@ -72,8 +85,7 @@ const FAQ = {
   help: [
     ['The screen is black.', 'Press PWR. Still dark? Hold PWR for 4 s, or charge it.'],
     ['My creature is a number, not a picture.', 'The memory card is missing or loose. Put it back in.'],
-    ['A region says NEEDS PACK.', 'Its pictures aren\'t on the card yet. Add them from the website below.'],
-    ['It never goes to sleep.', 'Set the clock: menu, then Settings.'],
+    ['A region says NEEDS PACK.', 'Its pictures aren\'t on the card yet. Add them from the website below.'],    ['It never goes to sleep.', 'Set the clock: menu, then Settings.'],
     ['Can I change the language?', 'Yes! Menu, then Settings. There are six to pick from.'],
   ],
 };

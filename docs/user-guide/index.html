@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="fw" content="3.11">
+<meta name="fw" content="3.12">
 <title>TamaPoke - User Guide</title>
 <link rel="stylesheet" href="style.css">
 <script src="guide.js" defer></script>
 </head>
 <body>
 <div class="toolbar no-print">
-  <span>TamaPoke user guide &middot; A6 booklet, 8 pages</span>
+  <span>TamaPoke user guide &middot; A6 booklet, 10 pages</span>
   <button id="print">Print</button>
 </div>
 
@@ -59,7 +59,7 @@
   <p>From the home screen, <b>swipe</b> in any direction:</p>
   <div class="compass">
     <div class="up"><b>&uarr; Up</b>Your creature's card: stats &amp; moves</div>
-    <div class="left"><b>&larr; Left</b>Gyms &amp; battles with friends</div>
+    <div class="left"><b>&larr; Left</b>Gyms, wild creatures &amp; friends</div>
     <img class="screen mini" src="../screens/main.png" alt="">
     <div class="right"><b>Right &rarr;</b>Your team &amp; storage box</div>
     <div class="down"><b>&darr; Down</b>Your trainer card: badges &amp; medals</div>
@@ -86,22 +86,47 @@
   <p class="tip">Want to stop early? <b>Retire</b> (in the menu) only after its goodbye is ready, or your creature is <b>gone for good</b>.</p>
 </section>
 
-<!-- 7. Train, battle, collect -->
+<!-- 7. Train & battle -->
 <section class="page">
-  <h2>Train, battle &amp; collect</h2>
+  <h2>Train &amp; battle</h2>
   <h3>Get stronger</h3>
   <div class="chips" data-cards="train"></div>
   <h3>Take on the gyms</h3>
   <div class="row tight">
     <img class="screen sm" src="../screens/gympick.png" alt="Pick a region's gyms">
-    <img class="screen sm" src="../screens/btlmenu.png" alt="A battle">
+    <img class="screen sm" src="../screens/pick.png" alt="Choose your team">
+    <img class="screen sm" src="../screens/win.png" alt="Win a badge">
   </div>
   <ul data-list="battle"></ul>
-  <h3>Catch 'em all</h3>
-  <ul data-list="collect"></ul>
 </section>
 
-<!-- 8. Help -->
+<!-- 8. Wild Pokemon -->
+<section class="page">
+  <h2>Into the wild</h2>
+  <div class="steps" data-cards="wild"></div>
+  <div class="row">
+    <img class="screen mini" src="../screens/btlmenu.png" alt="A wild battle">
+  </div>
+  <ul data-list="wild"></ul>
+</section>
+
+<!-- 9. Collect -->
+<section class="page">
+  <h2>Catch 'em all</h2>
+  <div class="row">
+    <img class="screen" src="../screens/dexpick.png" alt="Pick a region's Pokedex">
+    <span class="arrow">&rarr;</span>
+    <img class="screen" src="../screens/gallery.png" alt="Every creature you have raised">
+  </div>
+  <ul data-list="collect"></ul>
+  <div class="row tight">
+    <img class="screen sm" src="../screens/player.png" alt="Your trainer card">
+    <img class="screen sm" src="../screens/box.png" alt="The storage box">
+  </div>
+  <p class="tip"><b>Your trainer card</b> (swipe down) keeps your badges, medals and daily streak forever, whatever happens to your creature.</p>
+</section>
+
+<!-- 10. Help -->
 <section class="page back">
   <h2>Need a hand?</h2>
   <dl class="faq" data-faq="help"></dl>
