@@ -92,9 +92,37 @@ int main(){
     int diff = 0;
     for (size_t i = 0; i < both.size(); i++) if (both[i] != solo[i]) diff++;
     ck(diff > 200, "two voices sound together, not one after the other");
-    int16_t pk = 0;
+    int pk = 0;
     for (int16_t v : both) if (abs(v) > pk) pk = abs(v);
-    ck(pk <= 32767, "and the mix does not clip");
+    ck(pk < 32767, "and two voices at full level do not clip at the top volume");
+  }
+
+  // --- THE VOLUME SETTING. Every level must be audibly different, for one voice
+  // and for battle music's two, or the settings screen is lying.
+  {
+    auto peakAt = [](uint8_t master, int voices, uint8_t vol){
+      GbSynth s;
+      s.note(0, 1750, 2, vol, 0, 0, 100);
+      if (voices > 1) s.note(1, 1200, 2, vol, 0, 0, 100);
+      std::vector<int16_t> buf(1000);
+      s.render(buf.data(), buf.size(), master);
+      int pk = 0;
+      for (int16_t v : buf) if (abs(v) > pk) pk = abs(v);
+      return pk;
+    };
+    bool rising = true, even = true, music = true;
+    for (uint8_t m = 2; m <= 10; m++) {
+      int lo = peakAt(m - 1, 1, 14), hi = peakAt(m, 1, 14);
+      double r = (double)hi / lo;
+      if (hi <= lo) rising = false;
+      if (r < 1.2 || r > 1.5) { even = false; printf("      level %u -> %u: x%.2f\n", m - 1, m, r); }
+      int mlo = peakAt(m - 1, 2, 12), mhi = peakAt(m, 2, 12);
+      if (mhi <= mlo || mhi >= 32767) { music = false; printf("      music level %u -> %u: %d -> %d\n", m - 1, m, mlo, mhi); }
+    }
+    ck(rising, "each volume step is louder than the one below");
+    ck(even, "and the steps are even (a gain curve, not linear: 1 must be quiet)");
+    ck(music, "battle music (two voices at 12) gets louder at every step and never clips");
+    ck(peakAt(1, 1, 14) * 8 < peakAt(10, 1, 14), "volume 1 is far quieter than volume 10");
   }
 
   // --- noise is not a tone: it must not repeat at an audible period

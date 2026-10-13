@@ -5,5 +5,7 @@ proto.h
 *.o
 # emulator save state and captures
 tamapoke.nvs
+*.nvs.rtc
+*.nvs.crash
 *.ppm
 *.png

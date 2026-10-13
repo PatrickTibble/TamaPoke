@@ -44,13 +44,17 @@ if command -v arduino-cli >/dev/null; then
   fi
 fi
 
+# FORK(wild): wild_areas.h is generated from docs/*_region_pokemon_encounters.md; a stale header or a guard that no longer fails stops the run
+if command -v python3 >/dev/null; then python3 "$ROOT/tools/gen_wild.py" --check && python3 "$ROOT/tools/gen_wild.py" --selftest >/dev/null || { echo "=== gen_wild.py --check / --selftest FAILED"; exit 1; }; fi  # FORK(wild)
+
 # arrays, not a string: the sprite dir has to reach the compiler still quoted,
 # and passing these through eval silently strips them
-CORE=("$ROOT/gbsynth.cpp" "$ROOT/pet.cpp" "$ROOT/i18n.cpp" "$ROOT/party.cpp" "$ROOT/battle.cpp" "$ROOT/link.cpp" "$ROOT/save.cpp")
+CORE=("$ROOT/gbsynth.cpp" "$ROOT/pet.cpp" "$ROOT/i18n.cpp" "$ROOT/party.cpp" "$ROOT/battle.cpp" "$ROOT/link.cpp" "$ROOT/save.cpp" "$ROOT/wild.cpp")
 FLAGS=(-std=c++17 -O1 -w -I"$EMU" -I"$ROOT" -DSPRITE_DIR="\"$ROOT/tools/sdcard/mons\"")
 
 # these drive setup()/loop()/render(), so they need the sketch itself
-needs_sketch() { case "$1" in touch_test|flush_test|joy_test|anim_test|swipe_test|lan_test|console_test|hit_test|starter_test|release_test) return 0;; *) return 1;; esac; }
+needs_sketch() { case "$1" in touch_test|flush_test|joy_test|anim_test|swipe_test|lan_test|console_test|hit_test|starter_test|release_test|badgesave_test) return 0;; *) return 1;; esac; }
+eval "up_$(declare -f needs_sketch)"; needs_sketch() { [ "$1" = wild_ui_test ] || up_needs_sketch "$1"; }  # FORK(wild)
 
 # and these are standalone: gbsynth.cpp has no Arduino dependency at all, which
 # is the point of it -- linking the game core in would only demand stubs for
@@ -66,8 +70,8 @@ for src in "$HERE"/*_test.cpp; do
   name="$(basename "$src" .cpp)"
   [ -n "$FILTER" ] && [[ "$name" != *"$FILTER"* ]] && continue
   extra=()
-  needs_sketch "$name" && extra=("$EMU/sketch.cpp" "$EMU/host_impl.cpp" "$EMU/font.cpp" "$EMU/clock.cpp")
-  needs_host "$name" && extra=("$EMU/host_impl.cpp" "$EMU/font.cpp")
+  needs_sketch "$name" && extra=("$EMU/sketch.cpp" "$EMU/host_impl.cpp" "$EMU/audio_stub.cpp" "$EMU/font.cpp" "$EMU/clock.cpp")
+  needs_host "$name" && extra=("$EMU/host_impl.cpp" "$EMU/audio_stub.cpp" "$EMU/font.cpp")
   srcs=("${CORE[@]}")
   standalone "$name" && srcs=("$ROOT/gbsynth.cpp")
   # every test starts from a clean NVS so one cannot leak state into the next

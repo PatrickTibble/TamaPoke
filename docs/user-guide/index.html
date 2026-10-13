@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="fw" content="3.12">
+<title>TamaPoke - User Guide</title>
+<link rel="stylesheet" href="style.css">
+<script src="guide.js" defer></script>
+</head>
+<body>
+<div class="toolbar no-print">
+  <span>TamaPoke user guide &middot; A6 booklet, 10 pages</span>
+  <button id="print">Print</button>
+</div>
+
+<main class="sheet">
+
+<!-- 1. Cover -->
+<section class="page cover">
+  <h1><img class="logo" src="logo.png" alt="Tama-Poke"></h1>
+  <p class="tag">Your Pocket Pok&eacute;mon!</p>
+  <img class="device" src="device.png" alt="TamaPoke device">
+  <p class="sub">Start here</p>
+  <p class="fw">Quick-start guide &middot; firmware v<span data-fw></span></p>
+  <div class="stripe"></div>
+</section>
+
+<!-- 2. First steps -->
+<section class="page">
+  <h2>Hello, Trainer!</h2>
+  <p class="lead">TamaPoke is a little creature that lives in your pocket. Feed it, play with it and watch it grow, in real time.</p>
+  <div class="steps" data-cards="start"></div>
+  <div class="row">
+    <img class="screen" src="../screens/region.png" alt="Choose a region">
+    <span class="arrow">&rarr;</span>
+    <img class="screen" src="../screens/starter.png" alt="Choose a starter">
+  </div>
+  <p class="tip"><b>Keep the memory card in!</b> It holds all the creature pictures.</p>
+</section>
+
+<!-- 3. Home screen -->
+<section class="page">
+  <h2>Your home screen</h2>
+  <figure class="annotated">
+    <img class="screen" src="../screens/main.png" alt="Home screen with numbered callouts">
+    <i style="--x:50%;--y:13%">1</i>
+    <i style="--x:66%;--y:58%">2</i>
+    <i style="--x:50%;--y:73%">3</i>
+    <i style="--x:50%;--y:92%">4</i>
+  </figure>
+  <ol class="legend" data-list="home"></ol>
+  <div class="chips" data-cards="buttons"></div>
+</section>
+
+<!-- 4. Getting around -->
+<section class="page">
+  <h2>Getting around</h2>
+  <p>From the home screen, <b>swipe</b> in any direction:</p>
+  <div class="compass">
+    <div class="up"><b>&uarr; Up</b>Your creature's card: stats &amp; moves</div>
+    <div class="left"><b>&larr; Left</b>Gyms, wild creatures &amp; friends</div>
+    <img class="screen mini" src="../screens/main.png" alt="">
+    <div class="right"><b>Right &rarr;</b>Your team &amp; storage box</div>
+    <div class="down"><b>&darr; Down</b>Your trainer card: badges &amp; medals</div>
+  </div>
+  <div class="chips wide" data-cards="touch"></div>
+  <p class="tip">To close a menu, just tap outside it.</p>
+</section>
+
+<!-- 5. Care -->
+<section class="page">
+  <h2>Keeping it happy</h2>
+  <p>Four bars show how your creature feels. They slowly go down all day, so check in often!</p>
+  <div class="grid2" data-cards="needs"></div>
+  <ul class="rules" data-list="rules"></ul>
+  <p class="tip"><b>Good night!</b> If you turn the screen off between midnight and 6&nbsp;am, your creature goes to sleep. It wakes up when you turn the screen back on.</p>
+</section>
+
+<!-- 6. Growing up -->
+<section class="page">
+  <h2>Watch it grow</h2>
+  <ol class="timeline" data-cards="growth"></ol>
+  <h3>Every story has an ending</h3>
+  <div class="endings" data-cards="endings"></div>
+  <p class="tip">Want to stop early? <b>Retire</b> (in the menu) only after its goodbye is ready, or your creature is <b>gone for good</b>.</p>
+</section>
+
+<!-- 7. Train & battle -->
+<section class="page">
+  <h2>Train &amp; battle</h2>
+  <h3>Get stronger</h3>
+  <div class="chips" data-cards="train"></div>
+  <h3>Take on the gyms</h3>
+  <div class="row tight">
+    <img class="screen sm" src="../screens/gympick.png" alt="Pick a region's gyms">
+    <img class="screen sm" src="../screens/pick.png" alt="Choose your team">
+    <img class="screen sm" src="../screens/win.png" alt="Win a badge">
+  </div>
+  <ul data-list="battle"></ul>
+</section>
+
+<!-- 8. Wild Pokemon -->
+<section class="page">
+  <h2>Into the wild</h2>
+  <div class="steps" data-cards="wild"></div>
+  <div class="row">
+    <img class="screen mini" src="../screens/btlmenu.png" alt="A wild battle">
+  </div>
+  <ul data-list="wild"></ul>
+</section>
+
+<!-- 9. Collect -->
+<section class="page">
+  <h2>Catch 'em all</h2>
+  <div class="row">
+    <img class="screen" src="../screens/dexpick.png" alt="Pick a region's Pokedex">
+    <span class="arrow">&rarr;</span>
+    <img class="screen" src="../screens/gallery.png" alt="Every creature you have raised">
+  </div>
+  <ul data-list="collect"></ul>
+  <div class="row tight">
+    <img class="screen sm" src="../screens/player.png" alt="Your trainer card">
+    <img class="screen sm" src="../screens/box.png" alt="The storage box">
+  </div>
+  <p class="tip"><b>Your trainer card</b> (swipe down) keeps your badges, medals and daily streak forever, whatever happens to your creature.</p>
+</section>
+
+<!-- 10. Help -->
+<section class="page back">
+  <h2>Need a hand?</h2>
+  <dl class="faq" data-faq="help"></dl>
+  <p class="tip"><b>Updates &amp; more regions:</b> open <b class="url">dylanpdao.github.io/TamaPoke/web</b> in Chrome or Edge and plug in your TamaPoke.</p>
+  <div class="legal">
+    <img class="logo" src="logo.png" alt="Tama-Poke">
+    <p><b>Unofficial fan project. Not for sale.</b> Not affiliated with or endorsed by Nintendo, Game Freak, Creatures Inc. or The Pok&eacute;mon Company. Pok&eacute;mon and all related names are trademarks of their respective owners.</p>
+    <p>Sprites: PMD SpriteCollab (CC BY-NC). Code: MIT. Original TamaPoke by Quique Tortosa.</p>
+  </div>
+  <div class="stripe"></div>
+</section>
+
+</main>
+</body>
+</html>

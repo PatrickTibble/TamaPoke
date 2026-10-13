@@ -21,7 +21,7 @@ volatile int g_touchX=0,g_touchY=0; volatile bool g_touchDown=false;
 uint32_t millis(){return 0;}
 void FakeESP::restart(){exit(0);}
 int FakeSerial::available(){return 0;} String FakeSerial::readStringUntil(char){return String("");}
-// sfxPlay comes from host_impl.cpp here -- this test links the host, not the sketch
+// sfxPlay comes from audio_stub.cpp here -- this test links the host, not the sketch
 void emuSetSpriteDir(const char *);
 static int bad=0;
 static void ck(bool ok,const char*w){printf("%s  %s\n",ok?"PASS":"FAIL",w); if(!ok)bad++;}

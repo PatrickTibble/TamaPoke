@@ -17,6 +17,7 @@
 
 #define ES8311_ADDR 0x18
 #define SAMPLE_RATE 16000
+#define AMP_HOLD_MS 1500
 
 static I2SClass i2s;
 static bool gReady = false;
@@ -139,32 +140,6 @@ static uint16_t hzToGb(uint16_t hz) {
   return (f < 0 || f > 2047) ? 0 : (uint16_t)f;
 }
 
-// reproduce un tono (o silencio si f==0) con rampa de ataque/caida anti-click
-static void playTone(uint16_t f, uint16_t ms) {
-  if (!gVol) { delay(ms); return; }   // muted: keep the timing, make no sound
-  int total = SAMPLE_RATE * ms / 1000;
-  int half = f ? (SAMPLE_RATE / (2 * f)) : 0;  // medio periodo en muestras
-  const int16_t amp = (int16_t)(500 * (gVol > 10 ? 10 : gVol));  // 0..5000
-  int phase = 0, done = 0;
-  bool high = true;
-  while (done < total) {
-    int n = total - done; if (n > 256) n = 256;
-    for (int i = 0; i < n; i++) {
-      int16_t s = 0;
-      if (f) {
-        s = high ? amp : -amp;
-        int idx = done + i;
-        if (idx < 64) s = (int16_t)(s * idx / 64);                 // ataque
-        else if (idx > total - 96) s = (int16_t)(s * (total - idx) / 96);  // caida
-        if (++phase >= half) { phase = 0; high = !high; }
-      }
-      buf[i * 2] = s; buf[i * 2 + 1] = s;
-    }
-    i2s.write((uint8_t *)buf, n * 4);
-    done += n;
-  }
-}
-
 // Renders `ms` of audio and pushes it to the codec. Everything sounds through
 // here now -- there is no separate "play a tone" path any more, which is what
 // lets music keep going while an effect cuts across it.
@@ -186,18 +161,23 @@ static void audioTask(void *) {
   uint32_t at1 = 0, at2 = 0, clock = 0;
   uint8_t playing = MUS_NONE;
   bool ampOn = false;
+  uint32_t quietSince = 0;
 
   for (;;) {
     uint8_t m = gMusic;
+    // Volume 0 is treated as sound off: rendering zeros would still switch the
+    // amp on, and its turn-on click is the one sound the volume cannot scale.
+    bool audible = gOn && gReady && gVol;
     bool wantAudio = (m != MUS_NONE) || gSyn.busy();
-    if (!gOn || !gReady) { gSyn.allOff(); m = MUS_NONE; wantAudio = false; }
+    if (!audible) { gSyn.allOff(); m = MUS_NONE; wantAudio = false; }
 
     // An effect always wins the melody voice. With three voices a cue that
     // mixed politely underneath would just be mud; cutting through is both
     // simpler and the right priority.
     if (xQueueReceive(gQ, &id, wantAudio ? 0 : pdMS_TO_TICKS(40)) == pdTRUE) {
-      if (gOn && gReady && id < SFX_COUNT) {
+      if (audible && id < SFX_COUNT) {
         if (!ampOn) { digitalWrite(PA, HIGH); delay(6); ampOn = true; }
+        quietSince = 0;
         const SfxDef &d = SFX[id];
         for (uint8_t i = 0; i < d.len; i++) {
           uint16_t f = hzToGb(d.n[i].f);
@@ -215,13 +195,27 @@ static void audioTask(void *) {
     }
 
     if (m == MUS_NONE) {
-      if (ampOn && !gSyn.busy()) { digitalWrite(PA, LOW); ampOn = false; }
+      // A tune stopped mid-note leaves its voices holding samples, and nothing
+      // renders on this branch: busy() would never clear, so the amp stayed on
+      // and this loop spun with a zero timeout. Cut the music voices instead.
+      if (playing != MUS_NONE) { gSyn.silence(0); gSyn.silence(1); }
+      if (gSyn.busy()) { pump(10); continue; }   // drain a tail, never spin
+      // The amp is held on briefly between sounds so a run of taps does not
+      // click at every one; muted, it goes off at once.
+      if (ampOn) {
+        uint32_t t = millis();
+        if (!quietSince) quietSince = t ? t : 1;
+        if (!audible || t - quietSince >= AMP_HOLD_MS) {
+          digitalWrite(PA, LOW); ampOn = false; quietSince = 0;
+        }
+      }
       playing = MUS_NONE; mi1 = mi2 = 0; at1 = at2 = clock = 0;
       continue;
     }
 
     if (m != playing) { playing = m; mi1 = mi2 = 0; at1 = at2 = clock = 0; }
     if (!ampOn) { digitalWrite(PA, HIGH); delay(6); ampOn = true; }
+    quietSince = 0;
 
     // 0 = the gym leader battle, 3 = the victory fanfare. Winning used to play
     // index 2, which is the WILD BATTLE theme -- so a win sounded like the fight
@@ -273,10 +267,10 @@ void audioBegin() {
   i2s.setPins(I2S_BCK_IO, I2S_WS_IO, I2S_DO_IO, I2S_DI_IO, I2S_MCK_IO);
   if (!i2s.begin(I2S_MODE_STD, SAMPLE_RATE, I2S_DATA_BIT_WIDTH_16BIT,
                  I2S_SLOT_MODE_STEREO, I2S_STD_SLOT_BOTH)) {
-    Serial.println("I2S begin fallo");
+    Serial.println("I2S begin failed");
     return;
   }
-  if (!es8311Init()) { Serial.println("ES8311 no responde (audio off)"); return; }
+  if (!es8311Init()) { Serial.println("ES8311 not responding (audio off)"); return; }
 
   Preferences p;
   p.begin("tamapoke", true);

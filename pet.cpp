@@ -39,7 +39,7 @@ static void loadBlob(Preferences &p, const char *key, void *dst, size_t n) {
 
 void Pet::begin() {
   prefs.begin("tamapoke", false);
-  opened = true;
+  prefs.opened = true;
   // Zeroed BEFORE the branch below, not inside load(): getBytes() leaves its
   // destination untouched when the key is missing, and the fresh-install path
   // returns without ever calling load(). Without this a begin() after a factory
@@ -144,7 +144,7 @@ void Pet::syncClock(uint32_t nowEpoch) {
     // la evolucion NO se aplica offline: queda lista y la dispara el usuario
     // tocando al bicho cuando vuelve (para que vea la transformacion)
   }
-  Serial.printf("offline: %u min aplicados (nv.%u)\n", mins, level());
+  Serial.printf("offline: %u min applied (lv.%u)\n", mins, level());
   save();
 }
 
@@ -1247,8 +1247,8 @@ void Pet::save() {
   // A Pet nobody opened is a scratch object -- the battle's opponent, a test
   // fixture, anything built to be read and thrown away. It shares the single
   // NVS namespace with the real creature, so letting it write means it
-  // OVERWRITES the player's pet. See the note on `opened` in pet.h.
-  if (!opened) return;
+  // OVERWRITES the player's pet. See the note on `prefs.opened` in pet.h.
+  if (!prefs.opened) return;
   ticksSinceSave = 0;
   pendingSave = false;
   prefs.putUChar("full", fullness);

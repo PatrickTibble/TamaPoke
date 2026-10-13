@@ -29,7 +29,10 @@ inline void delay(uint32_t ms) {
   // the sketch relies on it for correctness, only for boot-time settling
   (void)ms;
 }
+#define LOW 0
+#define HIGH 1
 inline void pinMode(int, int) {}
+inline void digitalWrite(int, int) {}
 inline int digitalPinToInterrupt(int p) { return p; }
 
 // There is no interrupt controller here, so the handler is kept in a slot and
@@ -124,8 +127,17 @@ esp_reset_reason_t emuResetReason();
 inline esp_reset_reason_t esp_reset_reason() { return emuResetReason(); }
 extern FakeESP ESP;
 
+// Every address ACKs, so audio.cpp's ES8311 probe passes and its init runs.
 struct FakeWire {
   void begin(int, int) {}
   void setTimeOut(int) {}
+  void beginTransmission(int) {}
+  size_t write(uint8_t) { return 1; }
+  uint8_t endTransmission(bool = true) { return 0; }
+  uint8_t requestFrom(int, int) { return 0; }
+  int available() { return 0; }
+  int read() { return -1; }
 };
 extern FakeWire Wire;
+
+#include "rtos_shim.h"

@@ -29,6 +29,7 @@
 #include "party.h"
 #include "save.h"
 #include "pet.h"
+#include "wild.h"  // FORK(wild)
 #include "sdmon.h"
 #include "rtcbat.h"
 #include "i18n.h"
@@ -36,7 +37,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.11"
+#define FW_VERSION "3.12.0"  // FORK(wild): the fork's own version
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
   LCD_CS, LCD_SCLK, LCD_SDIO0, LCD_SDIO1, LCD_SDIO2, LCD_SDIO3);
@@ -336,9 +337,9 @@ uint8_t btlMyAct = 0;        // host: our own action, latched until theirs lands
 #define UI_TAP_MIN 44
 
 // The LAN battle button on the gym region chooser.
-#define LANBTN_W 190
+#define LANBTN_W 150             // FORK(wild): shares its row with WILD
 #define LANBTN_H UI_TAP_MIN
-#define LANBTN_X (233 - LANBTN_W / 2)
+#define LANBTN_X (233 + 6)       // FORK(wild): the right half; WILD is the left
 #define LANBTN_Y 336
 
 #define BOXBTN_X 146
@@ -640,6 +641,8 @@ uint32_t choiceUntil = 0;   // se cierra solo a este millis
 int16_t tX0, tY0, tXl, tYl; // gesto en curso (inicio y ultima posicion)
 uint32_t tStart = 0;
 bool holdFired = false;
+bool touchTrace = false;    // TOUCH on the console: print every gesture's coordinates
+uint8_t tMaxPts = 0;        // most points the chip reported during the gesture (>1 = a ghost touch)
 
 void setup() {
   Serial.setRxBufferSize(8192);  // la transferencia a SD llega en bloques de 2 KB
@@ -665,7 +668,7 @@ void setup() {
 
   // QSPI a 80MHz (por defecto 40): el flush del framebuffer es el cuello de
   // botella del fps (~56ms a 40MHz). Si el panel mostrara basura, bajar a 40M.
-  if (!gfx->begin(80000000)) Serial.println("gfx->begin() fallo");
+  if (!gfx->begin(80000000)) Serial.println("gfx->begin() failed");
   panel->setBrightness(180);
 
   touch.setPins(TP_RESET, TP_INT);
@@ -674,7 +677,7 @@ void setup() {
     touchOk = touch.begin(Wire, 0x5A, IIC_SDA, IIC_SCL);
     if (!touchOk) delay(150);
   }
-  if (!touchOk) Serial.println("CST9217 no detectado");
+  if (!touchOk) Serial.println("CST9217 not detected");
   // begin() deja el chip en modo comando (lee la identidad y no sale);
   // hace falta un reset por hardware para que vuelva a reportar toques
   touch.reset();
@@ -686,6 +689,7 @@ void setup() {
 
   party.begin();
   pet.begin();
+  wildLoad();  // FORK(wild)
   sdBegin();
   thumbs.load();
 
@@ -697,7 +701,7 @@ void setup() {
   if (e == 0) {
     rtcSetEpoch(1767225600UL);  // RTC virgen: semilla (la hora absoluta da igual,
     e = rtcEpoch();             // solo importan las diferencias)
-    Serial.println("RTC sin hora: sembrado, sin progresion offline esta vez");
+    Serial.println("RTC had no time: seeded, no offline progression this boot");
   }
   pet.syncClock(e);
 
@@ -855,6 +859,7 @@ void handleSerial() {
   line.trim();
   if (line.length() == 0) return;
   if (sdSerialCommand(line)) return;
+  if (wildSerial(line)) return;  // FORK(wild)
 
   if (line == "HATCH") {
     pet.eggTap(); pet.eggTap(); pet.eggTap();
@@ -864,7 +869,7 @@ void handleSerial() {
     if (n >= 1 && n <= DEX_COUNT) {
       pet.prevSpeciesId = pet.speciesId;
       pet.speciesId = n;
-      Serial.printf("especie #%d %s\n", n, DEX_TBL[n].name);
+      Serial.printf("species #%d %s\n", n, DEX_TBL[n].name);
     }
     Serial.println("DONE");
   } else if (line.startsWith("LVL ")) {
@@ -878,7 +883,7 @@ void handleSerial() {
     pet.saveNow();
     Serial.printf("lvl=%u\n", pet.level());
   } else if (line.startsWith("MISS ")) {
-    // MISS <n>: sets the care mistakes -- "descuidos", the desc= on STATS.
+    // MISS <n>: sets the care mistakes, the miss= on STATS.
     // Each one pushes every evolution threshold up a level, so a creature that
     // was neglected early evolves late; MISS 0 forgives that. Its sibling
     // commands are IV, TR and LVL.
@@ -887,7 +892,7 @@ void handleSerial() {
     if (m > 255) m = 255;
     pet.careMistakes = (uint8_t)m;
     pet.saveNow();
-    Serial.printf("desc=%u\n", pet.careMistakes);
+    Serial.printf("miss=%u\n", pet.careMistakes);
   } else if (line.startsWith("TR ")) {
     // TR <atk> <def> <spe>: sets the TRAINING (this game's EVs), for testing a
     // fully-raised creature without playing the minigames for an hour. Each is
@@ -902,7 +907,7 @@ void handleSerial() {
       pet.trSpe = (uint8_t)(e < 0 ? 0 : (e > pet.trMaxSpe() ? pet.trMaxSpe() : e));
       pet.saveNow();
     }
-    Serial.printf("tr=%u/%u/%u topes=%u/%u/%u\n", pet.trAtk, pet.trDef, pet.trSpe,
+    Serial.printf("tr=%u/%u/%u caps=%u/%u/%u\n", pet.trAtk, pet.trDef, pet.trSpe,
                   pet.trMaxAtk(), pet.trMaxDef(), pet.trMaxSpe());
   } else if (line.startsWith("IV ")) {
     // IV <fue> <def> <vel> <vit>: fija los valores individuales (pruebas).
@@ -920,7 +925,7 @@ void handleSerial() {
       if (pet.trSpe > pet.trMaxSpe()) pet.trSpe = pet.trMaxSpe();
     }
     pet.saveNow();   // IV used to change RAM only and never write
-    Serial.printf("iv=%u/%u/%u/%u topes=%u/%u/%u\n", pet.ivAtk, pet.ivDef,
+    Serial.printf("iv=%u/%u/%u/%u caps=%u/%u/%u\n", pet.ivAtk, pet.ivDef,
                   pet.ivSpe, pet.ivHp, pet.trMaxAtk(), pet.trMaxDef(), pet.trMaxSpe());
     Serial.println("DONE");
   } else if (line.startsWith("TIME ")) {
@@ -971,7 +976,7 @@ void handleSerial() {
       startBattle(dex, lvl > 0 ? (uint8_t)lvl : pet.level());
       Serial.printf("battle vs %s Lv.%u\n", DEX_TBL[dex].name, btlFoe.level);
     } else {
-      Serial.println("uso: BATTLE <dex> [nivel]");
+      Serial.println("usage: BATTLE <dex> [level]");
     }
     Serial.println("DONE");
   } else if (line == "SHINY") {  // alterna shiny del actual (pruebas)
@@ -1071,7 +1076,7 @@ void handleSerial() {
     for (int i = 0; i < PARTY_SLOTS; i++) {
       const PartyMon &m = party.slots[i];
       if (m.empty()) Serial.print(" -");
-      else Serial.printf(" %s%s(nv%u)", DEX_TBL[m.dex].name, m.shiny ? "*" : "", m.level);
+      else Serial.printf(" %s%s(lv%u)", DEX_TBL[m.dex].name, m.shiny ? "*" : "", m.level);
     }
     Serial.println();
     Serial.println("DONE");
@@ -1091,15 +1096,24 @@ void handleSerial() {
                   SCREEN_NAME[uiCurrentScreen() % SCR_COUNT],
                   btlPmd[0].loaded ? 1 : 0, btlPmd[1].loaded ? 1 : 0);
     Serial.println("DONE");
+  } else if (line == "TOUCH") {
+    touchTrace = !touchTrace;
+    Serial.printf("touch trace %s (panel %dx%d, chip %ux%u)\n", touchTrace ? "ON" : "OFF",
+                  LCD_WIDTH, LCD_HEIGHT, touch.getResolutionX(), touch.getResolutionY());
+  } else if (line == "TOUCHRESET") {
+    // The chip re-baselines on reset: anything on the glass right now is taken as "no touch".
+    touch.reset();
+    wasPressed = false;
+    Serial.println("touch chip reset -- keep fingers off the glass for 1 s");
   } else if (line == "STATS") {
-    Serial.printf("spec=%d nv=%u com=%u fel=%u ene=%u lim=%u desc=%u sd=%d mon=%d bat=%d usb=%d rtc=%u\n",
+    Serial.printf("spec=%d lvl=%u food=%u joy=%u ene=%u hyg=%u miss=%u sd=%d mon=%d bat=%d usb=%d rtc=%u\n",
                   pet.speciesId, pet.level(), pet.fullness, pet.joy, pet.energy,
                   pet.hygiene, pet.careMistakes, sdReady, mon.loaded,
                   batPercent(), usbPresent(), rtcEpoch());
-    Serial.printf("peso=%u fue=%u def=%u vel=%u vit=%u baya=%d\n",
+    Serial.printf("wt=%u atk=%u def=%u spe=%u hp=%u berry=%d\n",
                   pet.weight, pet.atkStat(), pet.defStat(), pet.speStat(),
                   pet.vitStat(), pet.berryKnown);
-    Serial.printf("iv=%u/%u/%u/%u tr=%u/%u/%u topes=%u/%u/%u\n",
+    Serial.printf("iv=%u/%u/%u/%u tr=%u/%u/%u caps=%u/%u/%u\n",
                   pet.ivAtk, pet.ivDef, pet.ivSpe, pet.ivHp,
                   pet.trAtk, pet.trDef, pet.trSpe,
                   pet.trMaxAtk(), pet.trMaxDef(), pet.trMaxSpe());
@@ -1127,7 +1141,9 @@ void handleTouch() {
   if (!gTouchIrq && !wasPressed) return;
   gTouchIrq = false;
   int16_t x, y;
-  bool pressed = touch.getPoint(&x, &y, 1) > 0;
+  uint8_t pts = touch.getPoint(&x, &y, 1);
+  bool pressed = pts > 0;
+  if (pts > tMaxPts) tMaxPts = pts;
 
   // saco de entrenamiento: cada toque cuenta al instante (aporrear rapido)
   if (sackOpen) {
@@ -1173,11 +1189,17 @@ void handleTouch() {
     lastInteract = millis();
     int dx = tXl - tX0, dy = tYl - tY0;
     uint32_t dt = millis() - tStart;
+    const char *kind = "ignored";
+    uint8_t scr = uiCurrentScreen();
     if (!holdFired && !swallowGesture) {
-      if (abs(dx) > 80 && abs(dy) < 70 && dt < 800) onSwipe(dx > 0 ? 1 : -1);
-      else if (abs(dy) > 80 && abs(dx) < 70 && dt < 800) onSwipeV(dy > 0 ? 1 : -1);
-      else if (dt < 1500 && abs(dx) < 40 && abs(dy) < 40) onTap(tX0, tY0);
+      if (abs(dx) > 80 && abs(dy) < 70 && dt < 800) { kind = "swipeH"; onSwipe(dx > 0 ? 1 : -1); }
+      else if (abs(dy) > 80 && abs(dx) < 70 && dt < 800) { kind = "swipeV"; onSwipeV(dy > 0 ? 1 : -1); }
+      else if (dt < 1500 && abs(dx) < 40 && abs(dy) < 40) { kind = "tap"; onTap(tX0, tY0); }
     }
+    if (touchTrace)
+      Serial.printf("TOUCH %s from=%d,%d to=%d,%d dt=%lu pts=%u screen=%s\n", kind, tX0, tY0,
+                    tXl, tYl, (unsigned long)dt, tMaxPts, SCREEN_NAME[scr % SCR_COUNT]);
+    tMaxPts = 0;
   }
   wasPressed = pressed;
 }
@@ -1546,6 +1568,7 @@ void onSwipe(int dir) {
   // it sits on TOP of the starter/gallery/gym screens -- each of which has its
   // own horizontal handler that would otherwise swallow the gesture. Paging a
   // screen by closing it is the bug this project shipped four times.
+  if (wildAreaSwipe(dir)) return;  // FORK(wild)
   if (rpickSwipe(dir)) return;
   if (pet.awaitingStarter()) return;  // bloqueado durante la eleccion de inicial
   if (menuOpen) { menuOpen = false; return; }   // any swipe closes the menu
@@ -1682,6 +1705,8 @@ void onTap(int16_t x, int16_t y) {
     return;
   }
   if (gymOpen && gymPick) {
+    if (wildAreasShown) { wildAreaTap(x, y); return; }  // FORK(wild)
+    if (wildPickOpen) { wildPickTap(x, y); return; }  // FORK(wild)
     int r = regionPickTap(x, y, RPICK_FOR_GYMS);
     if (r >= 0) {
       gymRegion = (uint8_t)r;
@@ -1690,6 +1715,7 @@ void onTap(int16_t x, int16_t y) {
       sfxPlay(SFX_TAP);
       return;
     }
+    if (wildGymTap(x, y)) return;  // FORK(wild)
     if (y >= LANBTN_Y && y <= LANBTN_Y + LANBTN_H &&
         x >= LANBTN_X && x <= LANBTN_X + LANBTN_W) {   // LAN battle
       gymOpen = false; gymPick = false;
@@ -2236,7 +2262,7 @@ void render() {
     return;
   }
   if (gymOpen) {
-    if (gymPick) renderRegionPick(RPICK_FOR_GYMS);
+    if (gymPick) { if (wildAreasShown) wildRenderAreas(); else renderRegionPick(wildRpickMode()); }  // FORK(wild)
     else renderGyms();
     return;
   }
@@ -3405,7 +3431,7 @@ void startTrainerBattle(uint8_t idx, bool hard) {
 void startBattle(int16_t dex, uint8_t lvl) {
   if (pet.isEgg() || pet.ceremony != CER_NONE) return;
   if (dex < 1 || dex > DEX_COUNT) return;
-  buildSquad(0, TRAINER_TEAM_MAX, 0xFFFF);
+  buildSquad(0, TRAINER_TEAM_MAX, btlWild ? squadMask : 0xFFFF);  // FORK(wild)
   if (!btlSquadN) return;
   // The opponent is built through Pet so it gets the same stat formula and the
   // same learnset-driven moveset the player's creature does -- no special-cased
@@ -3620,6 +3646,7 @@ static void btlResolve(uint8_t yourMove) {
     btlWon = btlFoe.fainted();
     btlNewBadge = false;
     btlTrainGain = 0;
+    if (btlWild && wildBattleOver()) return;  // FORK(wild)
     if (btlWon && btlTrainer >= 0 && !pet.hasBadge(btlRegion, btlTrainer, btlHard)) {
       pet.winBadge(btlRegion, btlTrainer, btlHard);
       btlNewBadge = true;
@@ -4019,32 +4046,38 @@ static bool btlBackTap(int16_t x, int16_t y) {
 // Running. A gym leader keeps their badge and the fight simply ends; against
 // another device the peer is told, so it does not sit waiting for a move that
 // will never come.
-static void btlRun() {
-  sfxPlay(SFX_DENY);
+// Every way out of a fight closes it here. The tap after a wild or LAN result
+// had its own copy that never stopped the music, so the 90 s victory theme
+// played on long after the battle screen was gone.
+static void btlClose() {
   btlFreeSprites();
   audioMusic(MUS_NONE);
-  if (btlLink) { lanLeave(); btlLink = false; lanOpen = true; }
   battleOpen = false;
   btlMenu = 0;
+}
+
+static void btlRun() {
+  sfxPlay(SFX_DENY);
+  if (btlLink) { lanLeave(); btlLink = false; lanOpen = true; }
+  btlClose();
+  if (btlWild) wildAfterBattle();  // FORK(wild)
 }
 
 void battleTap(int16_t x, int16_t y) {
   if (btlWinUntil) {          // dismiss the win screen and leave the fight
     btlWinUntil = 0;
-    btlFreeSprites();
-    audioMusic(MUS_NONE);
-    battleOpen = false;
+    btlClose();
     if (btlLink) { btlLink = false; lanOpen = true; }
     return;
   }
   if (btlMsgCount) {          // a tap clears the narration and returns the menu
     btlMsgCount = 0;
     if (btlOver) {
-      btlFreeSprites();
-      battleOpen = false;
+      btlClose();
       // Back to the LAN screen rather than all the way out: that is where a
       // rematch is offered, and re-pairing for every fight would be tedious.
       if (btlLink) { btlLink = false; lanOpen = true; }
+      if (btlWild) wildAfterBattle();  // FORK(wild)
       return;
     }
     if (btlSwapWho >= 0) btlDoSwap();   // the replacement arrives on this beat
@@ -4456,6 +4489,8 @@ void renderPick() {
   if (pickTrainer == PICK_LAN) {
     snprintf(head, sizeof(head), "%s: %s", T(S_LAN),
              lanWantHost ? T(S_LAN_HOST) : T(S_LAN_JOIN));
+  } else if (pickTrainer == PICK_WILD) {  // FORK(wild)
+    wildPickHead(head, sizeof(head));
   } else {
     const Trainer &t = TRAINERS[pickTrainer];
     for (int k = 0; k < t.count; k++)
@@ -4513,6 +4548,7 @@ void pickTap(int16_t x, int16_t y) {
       x >= PICK_BACK_X && x <= PICK_BACK_X + PICK_BTN_W) {   // BACK
     sfxPlay(SFX_TAP);
     pickOpen = false;
+    if (pickTrainer == PICK_WILD) { wildPickBack(); return; }  // FORK(wild)
     if (pickTrainer == PICK_LAN) { lanOpen = true; }
     else { gymOpen = true; }
     return;
@@ -4532,6 +4568,7 @@ void pickTap(int16_t x, int16_t y) {
       lanOpen = true;
       return;
     }
+    if (pickTrainer == PICK_WILD) { wildFight(); return; }  // FORK(wild)
     startTrainerBattle(pickTrainer, pickHard);
     return;
   }
@@ -4888,7 +4925,7 @@ uint8_t rpickModeNow() {
   switch (uiCurrentScreen()) {
     case SCR_REGION:  return RPICK_FOR_START;
     case SCR_DEXPICK: return RPICK_FOR_DEX;
-    case SCR_GYMPICK: return RPICK_FOR_GYMS;
+    case SCR_GYMPICK: return wildRpickMode();  // FORK(wild)
     default: return 0xFF;
   }
 }
@@ -4915,6 +4952,7 @@ static void renderRegionPick(uint8_t mode) {
   gfx->fillCircle(CX, CY, 231, UI_BG_DAY);
   char ttl[40];
   if (mode == RPICK_FOR_START) snprintf(ttl, sizeof(ttl), "%s", T(S_CHOOSE_REGION));
+  else if (mode == RPICK_FOR_WILD) snprintf(ttl, sizeof(ttl), "%s", WT(W_TITLE));  // FORK(wild)
   else if (forGyms) snprintf(ttl, sizeof(ttl), "%s", T(S_GYMS));
   else snprintf(ttl, sizeof(ttl), T(S_POKEDEX_FMT), pet.registeredCount(), DEX_COUNT);
   gfx->setTextColor(UI_INK);
@@ -4946,9 +4984,10 @@ static void renderRegionPick(uint8_t mode) {
       snprintf(sub, sizeof(sub), "%s", T(S_NEED_PACK));
     else if (mode == RPICK_FOR_GYMS)
       snprintf(sub, sizeof(sub), T(S_BADGES_FMT), pet.badgeCountIn(i, gymHard));
-    else if (mode == RPICK_FOR_DEX)
+    else if (mode == RPICK_FOR_DEX || mode == RPICK_FOR_WILD)  // FORK(wild)
       snprintf(sub, sizeof(sub), "%u/%u",
-               pet.registeredCountIn(REGIONS[i].lo, REGIONS[i].hi),
+               mode == RPICK_FOR_WILD ? wildSeenCountIn(pet, i)  // FORK(wild)
+                                      : pet.registeredCountIn(REGIONS[i].lo, REGIONS[i].hi),
                (unsigned)(REGIONS[i].hi - REGIONS[i].lo + 1));
     if (sub[0]) {
       gfx->setTextColor(UI_TRACK);
@@ -4962,9 +5001,10 @@ static void renderRegionPick(uint8_t mode) {
     gfx->drawRoundRect(LANBTN_X, LANBTN_Y, LANBTN_W, LANBTN_H, 11, UI_INK);
     gfx->setTextColor(UI_INK);
     gfx->setTextSize(2);
-    gfx->setCursor(CX - strlen(T(S_LAN)) * 6, LANBTN_Y + 14);
+    gfx->setCursor(LANBTN_X + LANBTN_W / 2 - strlen(T(S_LAN)) * 6, LANBTN_Y + 14);  // FORK(wild)
     gfx->print(T(S_LAN));
   }
+  wildDrawPick(mode);  // FORK(wild)
   if (pages > 1) {                        // dots: which page of regions this is
     int total = pages * 16 - 8;
     for (uint8_t d = 0; d < pages; d++) {
@@ -6275,3 +6315,5 @@ void drawMap(const char *const *map, int n, int x, int y, int s, bool silhouette
     }
   }
 }
+
+#include "wild_ui.h"  // FORK(wild): last, so it sees every sketch global

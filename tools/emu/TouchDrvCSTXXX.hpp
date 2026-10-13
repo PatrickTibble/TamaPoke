@@ -13,6 +13,8 @@ public:
   void reset() {}
   void setMaxCoordinates(int, int) {}
   void setMirrorXY(bool, bool) {}
+  uint16_t getResolutionX() { return 466; }
+  uint16_t getResolutionY() { return 466; }
   uint8_t getPoint(int16_t *x, int16_t *y, uint8_t) {
     if (!g_touchDown) return 0;
     *x = g_touchX;

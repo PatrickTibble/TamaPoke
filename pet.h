@@ -418,7 +418,19 @@ public:
   void saveNow();
 
 private:
-  Preferences prefs;
+  // A COPY of a Pet must not copy its NVS handle either. The handle is a plain
+  // integer and ~Preferences() closes it, so buildSquad()'s `Pet tmp = pet;`
+  // closed the LIVE pet's handle on leaving scope: every save after the first
+  // battle of a session failed silently, and a badge won showed, unlocked its
+  // areas, and was gone after the next reboot. A copy gets a fresh, unopened
+  // store instead -- it is a scratch Pet, which by the rule below cannot write.
+  struct Store : Preferences {
+    bool opened = false;
+    Store() = default;
+    Store(const Store &) : Preferences() {}
+    Store &operator=(const Store &) { return *this; }
+  };
+  Store prefs;
   // A Pet that was never begin()'d MUST NOT WRITE. Nothing enforced that, and
   // the battle code builds its opponent as a throwaway Pet:
   //
@@ -432,8 +444,9 @@ private:
   // That is the "flashed and my mon got replaced with an older one" report.
   //
   // The rule belongs here rather than at the call sites: every future throwaway
-  // Pet is covered without anyone having to remember.
-  bool opened = false;
+  // Pet is covered without anyone having to remember. The flag is
+  // `prefs.opened`, kept with the handle so a copy can never carry one without
+  // the other.
   uint32_t lastTick = 0;
   uint32_t eatUntil = 0;
   uint32_t heartUntil = 0;

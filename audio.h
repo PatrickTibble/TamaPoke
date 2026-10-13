@@ -31,8 +31,9 @@ enum Sfx : uint8_t {
 enum Music : uint8_t { MUS_NONE = 0, MUS_BATTLE, MUS_VICTORY };
 void audioMusic(uint8_t id);
 
-// 0..10. Stored, and applied as the square wave's amplitude; 0 is silence
-// without disabling the system, which is what a mute expects to do.
+// 0..10. Stored, and applied to EVERY sound as the master gain in
+// GbSynth::render(), 2.5 dB a step. 0 is silence with the amp kept off, without
+// disabling the system, which is what a mute expects to do.
 void audioSetVolume(uint8_t v);
 uint8_t audioVolume();
 

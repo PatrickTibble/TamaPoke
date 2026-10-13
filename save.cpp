@@ -1,4 +1,5 @@
 #include "save.h"
+#include "wild.h"
 #include <Arduino.h>
 #include <Preferences.h>
 #include <string.h>
@@ -27,6 +28,7 @@ const SaveField SAVE_FIELDS[] = {
   { "reg", SK_U8 },     { "eggR", SK_BYTES },
   { "badgX", SK_BYTES },{ "badhX", SK_BYTES },
   { "badh", SK_U16 },   { "dexreg", SK_BYTES }, { "dexsh", SK_BYTES },
+  { WILD_SEEN_KEY, SK_BYTES },
   { "strk", SK_U16 },   { "bstrk", SK_U16 },  { "cday", SK_U32 },
   { "medal", SK_U16 },  { "tmedal", SK_U16 }, { "mstone", SK_U16 },
   { "ghi", SK_U16 },    { "shi", SK_U16 },    { "qhi", SK_U16 },

@@ -23,13 +23,14 @@ python3 genproto.py "$ROOT/TamaPoke.ino"
 # .ino is C++ but g++ will not compile that extension
 { echo '#include "proto.h"'; cat "$ROOT/TamaPoke.ino"; } > sketch.cpp
 
-g++ -std=c++17 -O1 -w \
+# audio.cpp is the firmware's own; i2s_sdl.cpp sends its I2S stream to the speakers
+g++ -std=c++17 -O1 -w -pthread \
   -I. -I"$ROOT" \
   -DSPRITE_DIR="\"$ROOT/tools/sdcard/mons\"" \
   $(sdl2-config --cflags) \
   -o tamapoke-emu \
-  sketch.cpp wavout.cpp "$ROOT/gbsynth.cpp" "$ROOT/pet.cpp" "$ROOT/i18n.cpp" "$ROOT/party.cpp" "$ROOT/battle.cpp" "$ROOT/link.cpp" "$ROOT/save.cpp" \
-  host_impl.cpp font.cpp clock.cpp main_sdl.cpp \
+  sketch.cpp wavout.cpp "$ROOT/gbsynth.cpp" "$ROOT/pet.cpp" "$ROOT/i18n.cpp" "$ROOT/party.cpp" "$ROOT/battle.cpp" "$ROOT/link.cpp" "$ROOT/save.cpp" "$ROOT/wild.cpp" "$ROOT/audio.cpp" \
+  host_impl.cpp i2s_sdl.cpp font.cpp clock.cpp main_sdl.cpp \
   $(sdl2-config --libs)
 
 echo "built: $HERE/tamapoke-emu"

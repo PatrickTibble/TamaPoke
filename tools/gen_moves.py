@@ -45,20 +45,20 @@ def main():
     seen = set()
     for name, slug, typ, cat, power, acc, eff, param, mask, stages, tgt, _ail, _ach in map(unpack, MOVES):
         if len(name) > MAX_NAME:
-            sys.exit('nombre demasiado largo (%d > %d): %s' % (len(name), MAX_NAME, name))
+            sys.exit('name too long (%d > %d): %s' % (len(name), MAX_NAME, name))
         if ident(name) in seen:
-            sys.exit('nombre duplicado: %s' % name)
+            sys.exit('duplicate name: %s' % name)
         seen.add(ident(name))
         if cat == MC_STATUS and power:
-            sys.exit('%s: un movimiento de estado no puede tener potencia' % name)
+            sys.exit('%s: a status move cannot have power' % name)
         if cat != MC_STATUS and not power and eff not in (4, 5):  # FIXED_LVL / FIXED
-            sys.exit('%s: potencia 0 sin dano fijo' % name)
+            sys.exit('%s: power 0 without fixed damage' % name)
         if (eff == EF_STAGE) != bool(mask):
-            sys.exit('%s: EF_STAGE y statMask no concuerdan' % name)
+            sys.exit('%s: EF_STAGE and statMask disagree' % name)
         if mask and not stages:
-            sys.exit('%s: statMask sin stages' % name)
+            sys.exit('%s: statMask without stages' % name)
         if not 0 <= acc <= 100:
-            sys.exit('%s: precision fuera de rango' % name)
+            sys.exit('%s: accuracy out of range' % name)
 
     idx = {name: i + 1 for i, (name, *_) in enumerate(MOVES)}  # 0 = MV_NONE
     by_slug = {slug: name for name, slug, *_ in MOVES if slug}
@@ -205,12 +205,12 @@ def main():
     open(path, 'w').write(''.join(o))
 
     tbl_bytes = len(flat) * 2 + len(ofs) * 2
-    print('movimientos: %d (+MV_NONE)' % len(MOVES))
-    print('learnsets: %d filas, %.1f de media, %d bytes de tabla'
+    print('moves: %d (+MV_NONE)' % len(MOVES))
+    print('learnsets: %d rows, %.1f on average, %d table bytes'
           % (len(flat), len(flat) / DEX_COUNT, tbl_bytes))
     if empties:
-        print('sin movimientos (usaran STRUGGLE): %s' % empties)
-    print('guardado %s' % os.path.normpath(path))
+        print('no moves (will use STRUGGLE): %s' % empties)
+    print('wrote %s' % os.path.normpath(path))
 
 
 if __name__ == '__main__':

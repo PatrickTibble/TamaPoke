@@ -20,7 +20,7 @@ import serial
 def find_port():
     ports = glob.glob('/dev/cu.usbmodem*')
     if not ports:
-        sys.exit("no encuentro la placa (/dev/cu.usbmodem*)")
+        sys.exit("board not found (/dev/cu.usbmodem*)")
     return ports[0]
 
 def wait_line(ser, expect, timeout=10):
@@ -29,7 +29,7 @@ def wait_line(ser, expect, timeout=10):
         line = ser.readline().decode(errors='replace').strip()
         if not line:
             continue
-        print(f"  placa: {line}")
+        print(f"  board: {line}")
         if line == expect:
             return True
         if line == 'ERR':
@@ -44,7 +44,7 @@ def main():
     args = ap.parse_args()
 
     port = args.port or find_port()
-    print(f"puerto {port}")
+    print(f"port {port}")
     ser = serial.Serial(port, 115200, timeout=1)
     time.sleep(1.5)
     ser.reset_input_buffer()
@@ -56,7 +56,7 @@ def main():
 
     files = sorted(glob.glob(os.path.join(os.path.dirname(__file__), 'sdcard', 'mons', '*.bin')))
     if not files:
-        sys.exit("no hay .bin; ejecuta antes tools/pack_pmd.py")
+        sys.exit("no .bin files; run tools/pack_pmd.py first")
     if args.only:
         files = [f for f in files if args.only in os.path.basename(f)]
         if not files:
@@ -69,7 +69,7 @@ def main():
         print(f"-> {name} ({size/1024:.0f} KB)")
         ser.write(f"PUT {name} {size}\n".encode())
         if not wait_line(ser, 'OK', 5):
-            print("   la placa no acepto el PUT, sigo con el siguiente")
+            print("   board rejected the PUT, moving on to the next")
             continue
         t0 = time.time()
         ok = True
@@ -90,8 +90,8 @@ def main():
             kbs = size / 1024 / max(0.01, time.time() - t0)
             print(f"   ok ({kbs:.0f} KB/s)")
         else:
-            print("   fallo la transferencia")
-    print("listo")
+            print("   transfer failed")
+    print("done")
 
 if __name__ == '__main__':
     main()

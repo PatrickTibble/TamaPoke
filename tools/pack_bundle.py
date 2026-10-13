@@ -63,11 +63,11 @@ def write_pak(out, files):
 def main():
     files = sorted(glob.glob(os.path.join(MONS, '*.bin')))
     if not files:
-        raise SystemExit('no hay sprites en ' + MONS)
+        raise SystemExit('no sprites in ' + MONS)
     # Files with no dex number in the name -- thumbs.bin -- are SHARED, not part
     # of any region. Splitting by dex range alone dropped thumbs.bin on the
-    # floor and the board says so at boot: "sin thumbs.bin (galeria sin
-    # miniaturas)".
+    # floor and the board says so at boot: "no thumbs.bin (gallery has no
+    # thumbnails)".
     #
     # They go in EVERY pack, not just the first. Riding only with Kanto meant
     # anyone who installed Johto or Hoenn WITHOUT Kanto -- which nothing stops

@@ -113,7 +113,7 @@ def render_sheet(results, path='tools/import_sheet.png', scale=4):
                 img.paste(big, (ox, oy), big)
             d.text((gx, oy + CELL * scale + 2), name, fill='#000')
     img.save(path)
-    print(f"guardado {path}")
+    print(f"wrote {path}")
 
 
 if __name__ == '__main__':
@@ -123,6 +123,6 @@ if __name__ == '__main__':
         if f.endswith('.gif'):
             results[f[:-4]] = convert(os.path.join(srcdir, f))
     if not results:
-        print(f"no hay GIFs en {srcdir}")
+        print(f"no GIFs in {srcdir}")
         sys.exit(1)
     render_sheet(results)

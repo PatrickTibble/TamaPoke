@@ -66,6 +66,7 @@
       <span slot="unsupported">Browser not supported (use Chrome/Edge).</span>
       <span slot="not-allowed">Needs HTTPS.</span>
     </esp-web-install-button>
+    <p class="note" id="fwver"></p>
     <p class="note" style="border-left:4px solid #e8503a;padding-left:10px">
        🔄 <b>Updating? Leave "Erase device" unchecked.</b> The installer asks
        once, with the box already unchecked — click <b>Next</b> without ticking
@@ -132,6 +133,11 @@ const log = (m) => { const el = document.getElementById('log'); el.style.display
 const supported = 'serial' in navigator;
 if (!supported) { document.getElementById('unsupported').style.display='block';
   document.getElementById('connect').disabled = true; }
+
+// Read from the manifest the Install button uses, so the page never states a version of its own.
+fetch('manifest.json').then(r => r.json())
+  .then(m => { document.getElementById('fwver').textContent = 'Firmware v' + m.version; })
+  .catch(() => {});
 
 let port, reader, writer, lineBuf = '';
 

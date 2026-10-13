@@ -1,0 +1,3 @@
+# Scripts run under bash (WSL, macOS, Linux); CRLF breaks them with $'\r' errors.
+*.sh text eol=lf
+*.py text eol=lf
