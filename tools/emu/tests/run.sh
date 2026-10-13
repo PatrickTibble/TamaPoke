@@ -70,8 +70,8 @@ for src in "$HERE"/*_test.cpp; do
   name="$(basename "$src" .cpp)"
   [ -n "$FILTER" ] && [[ "$name" != *"$FILTER"* ]] && continue
   extra=()
-  needs_sketch "$name" && extra=("$EMU/sketch.cpp" "$EMU/host_impl.cpp" "$EMU/font.cpp" "$EMU/clock.cpp")
-  needs_host "$name" && extra=("$EMU/host_impl.cpp" "$EMU/font.cpp")
+  needs_sketch "$name" && extra=("$EMU/sketch.cpp" "$EMU/host_impl.cpp" "$EMU/audio_stub.cpp" "$EMU/font.cpp" "$EMU/clock.cpp")
+  needs_host "$name" && extra=("$EMU/host_impl.cpp" "$EMU/audio_stub.cpp" "$EMU/font.cpp")
   srcs=("${CORE[@]}")
   standalone "$name" && srcs=("$ROOT/gbsynth.cpp")
   # every test starts from a clean NVS so one cannot leak state into the next

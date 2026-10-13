@@ -1,9 +1,9 @@
-// Host versions of the three hardware modules. The sprite loader is the real
+// Host versions of the hardware modules. The sprite loader is the real
 // TPK2/TPTH parser, just reading from a directory instead of the SD card.
+// Audio is not here: the emulator runs the real audio.cpp, the tests audio_stub.cpp.
 #include "Arduino.h"
 #include "sdmon.h"
 #include "rtcbat.h"
-#include "audio.h"
 #include "linknow.h"
 #include <cstdio>
 #include <string>
@@ -130,9 +130,6 @@ bool usbPresent() { return true; }
 void pwrSetup() {}
 bool pwrShortPressed() { return false; }
 
-// --- audio (silent) ---
-void audioBegin() {}
-void sfxPlay(uint8_t) {}
 // no radio here; the protocol itself is exercised by tests/link_test.cpp
 struct Link;
 // No radio here at all, which is why lossy_test drives Link directly instead
@@ -143,14 +140,6 @@ bool linkNowUp() { return false; }
 void linkNowPoll() {}
 static LinkNowStats gNoStats;
 const LinkNowStats &linkNowStats() { return gNoStats; }
-// audio is silent here, but the sketch calls these, so they have to exist
-static uint8_t g_emuVol = 7, g_emuMusic = 0;
-void audioMusic(uint8_t id) { g_emuMusic = id; }
-uint8_t emuMusic() { return g_emuMusic; }   // what the sketch last asked to play, for tests
-void audioSetVolume(uint8_t v) { g_emuVol = v > 10 ? 10 : v; }
-uint8_t audioVolume() { return g_emuVol; }
-void audioSetEnabled(bool on) { (void)on; }
-bool audioEnabled() { return true; }
 
 // Why the last run ended. The tests link this file but not main_sdl.cpp, so the
 // state lives here and the GUI sets it after reading a simulated crash.

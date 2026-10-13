@@ -7,7 +7,10 @@
 #include "pet.h"
 #include "party.h"
 #include "battle.h"
+#include "rtcbat.h"
+#include "ESP_I2S.h"
 #include <chrono>
+#include <ctime>
 #include <string>
 #include <deque>
 #include <unistd.h>
@@ -57,7 +60,43 @@ void emuSetResetReason(int r);
 extern uint32_t gCrumbMagic, gCrumbScreen, gCrumbHeap;
 static char **g_argv = nullptr;
 
+// --- the battery-backed RTC ---
+//
+// The board's PCF85063 keeps time while powered off and holds a clock set from
+// SETTINGS. Here it is the host's local time plus an offset kept beside the save,
+// so a set clock and --fast's head start survive a restart, and time spent closed
+// is offline time exactly as on the board. The firmware's epoch is local time.
+static std::string g_rtcFile;
+static int64_t hostLocalEpoch() {
+  time_t t = time(nullptr);
+  struct tm lt;
+  localtime_r(&t, &lt);
+  return (int64_t)t + lt.tm_gmtoff;
+}
+static void rtcRestore() {
+  long long off = 0;
+  FILE *f = fopen(g_rtcFile.c_str(), "rb");
+  bool had = f && fscanf(f, "%lld", &off) == 1;
+  if (f) fclose(f);
+  rtcSetEpoch((uint32_t)(hostLocalEpoch() + off));
+  if (had) return;
+  // No offset file means the RTC never ran here. A save from the old stub has a
+  // "seen" near 1970/2026-01-01 that would read as months offline and age the
+  // pet two weeks at boot; no real time passed, so restart it from now.
+  Preferences p;
+  p.begin("tamapoke", false);
+  if (p.getUInt("seen", 0)) p.putUInt("seen", rtcEpoch());
+  p.end();
+}
+static void rtcPersist() {
+  FILE *f = fopen(g_rtcFile.c_str(), "wb");
+  if (!f) return;
+  fprintf(f, "%lld\n", (long long)rtcEpoch() - (long long)hostLocalEpoch());
+  fclose(f);
+}
+
 static void crashArmAndReexec(int reason) {
+  rtcPersist();   // the RTC keeps running through a panic
   FILE *f = fopen(g_crashFile.c_str(), "wb");
   if (f) {
     fprintf(f, "%d %u %u %u\n", reason, gCrumbMagic, gCrumbScreen, gCrumbHeap);
@@ -409,14 +448,17 @@ int main(int argc, char **argv) {
     else if (!strcmp(argv[i], "--iv") && i + 1 < argc) shotIv = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--dex") && i + 1 < argc) shotDex = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--sprites") && i + 1 < argc) emuSetSpriteDir(argv[++i]);
+    else if (!strcmp(argv[i], "--mute")) emuAudioMute();
     else if (!strcmp(argv[i], "--wipe")) { remove(save); }
   }
   // Audio preview: no SDL, no board -- just a file you can listen to.
   if (wav) return wavMain(wav, demo);
-  if (shot) return shotMode(shot, shotOut, shotLvl, shotIv, shotDex);   // headless: no SDL at all
+  if (shot) { emuAudioMute(); return shotMode(shot, shotOut, shotLvl, shotIv, shotDex); }   // headless: no SDL at all
   g_crashFile = std::string(save) + ".crash";
+  g_rtcFile = std::string(save) + ".rtc";
   crashRestore();     // a simulated panic left its breadcrumb here
   nvsLoad(save);
+  rtcRestore();
 
   if (SDL_Init(SDL_INIT_VIDEO) != 0) { fprintf(stderr, "SDL: %s\n", SDL_GetError()); return 1; }
   SDL_Window *win = SDL_CreateWindow("TamaPoke (emulator)", SDL_WINDOWPOS_CENTERED,
@@ -478,7 +520,9 @@ int main(int argc, char **argv) {
   }
 
   nvsSave(save);
+  rtcPersist();
   printf("\nemu: state saved to %s\n", save);
+  emuAudioClose();
   SDL_DestroyTexture(tex);
   SDL_DestroyRenderer(ren);
   SDL_DestroyWindow(win);

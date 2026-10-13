@@ -3,6 +3,7 @@
 // pass while --fast still broke touch in the real thing.
 #include "Arduino.h"
 #include <chrono>
+#include <mutex>
 
 extern volatile bool g_touchDown;   // SDL layer: mouse button state
 extern bool wasPressed;             // sketch: a gesture is being tracked
@@ -22,6 +23,9 @@ uint32_t emuTimeScale() { return g_timeScale; }
 // moment you are. Accumulating (rather than scaling total elapsed time) keeps
 // it monotonic across a change of rate.
 uint32_t millis() {
+  // the audio task calls this from its own thread; leaked so exit cannot destroy it under that thread
+  static std::mutex *mx = new std::mutex;
+  std::lock_guard<std::mutex> lock(*mx);
   auto now = std::chrono::steady_clock::now();
   uint64_t dus = std::chrono::duration_cast<std::chrono::microseconds>(now - g_tLast).count();
   g_tLast = now;
