@@ -38,6 +38,8 @@ public:
   void end() { if (h) nvsHandles().erase(h); }
   void clear() { if (live()) kv.clear(); }
   bool isKey(const char *k) { return live() && kv.count(k) != 0; }
+  // Arduino Preferences::remove. The follower journal deletes f_swap with it.
+  bool remove(const char *k) { return live() && kv.erase(k) != 0; }
 
   template <typename T> void putT(const char *k, T v) {
     if (!live()) return;

@@ -418,6 +418,7 @@ public:
   void saveNow();
 
 private:
+  friend struct FollowIO; // FORK(follow)
   // A COPY of a Pet must not copy its NVS handle either. The handle is a plain
   // integer and ~Preferences() closes it, so buildSquad()'s `Pet tmp = pet;`
   // closed the LIVE pet's handle on leaving scope: every save after the first

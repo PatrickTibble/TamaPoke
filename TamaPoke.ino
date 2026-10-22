@@ -30,6 +30,7 @@
 #include "save.h"
 #include "pet.h"
 #include "wild.h"  // FORK(wild)
+#include "follow.h"  // FORK(follow)
 #include "sdmon.h"
 #include "rtcbat.h"
 #include "i18n.h"
@@ -689,6 +690,7 @@ void setup() {
 
   party.begin();
   pet.begin();
+  followLoad();  // FORK(follow)
   wildLoad();  // FORK(wild)
   sdBegin();
   thumbs.load();

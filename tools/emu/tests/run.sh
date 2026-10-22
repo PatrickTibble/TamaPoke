@@ -49,7 +49,7 @@ if command -v python3 >/dev/null; then python3 "$ROOT/tools/gen_wild.py" --check
 
 # arrays, not a string: the sprite dir has to reach the compiler still quoted,
 # and passing these through eval silently strips them
-CORE=("$ROOT/gbsynth.cpp" "$ROOT/pet.cpp" "$ROOT/i18n.cpp" "$ROOT/party.cpp" "$ROOT/battle.cpp" "$ROOT/link.cpp" "$ROOT/save.cpp" "$ROOT/wild.cpp")
+CORE=("$ROOT/gbsynth.cpp" "$ROOT/pet.cpp" "$ROOT/i18n.cpp" "$ROOT/party.cpp" "$ROOT/battle.cpp" "$ROOT/link.cpp" "$ROOT/save.cpp" "$ROOT/wild.cpp" "$ROOT/follow.cpp")
 FLAGS=(-std=c++17 -O1 -w -I"$EMU" -I"$ROOT" -DSPRITE_DIR="\"$ROOT/tools/sdcard/mons\"")
 
 # these drive setup()/loop()/render(), so they need the sketch itself
