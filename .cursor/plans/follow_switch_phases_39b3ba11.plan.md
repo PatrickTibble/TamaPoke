@@ -10,7 +10,7 @@ todos:
     status: completed
   - id: phase-3-cap
     content: "Phase 3: PARTY_CAP on isFull/firstFree, legacy slot-5 move, follow_ui cell guard and followShownCount at both S_PARTY_FMT sites."
-    status: pending
+    status: completed
   - id: phase-4-sheet
     content: "Phase 4: banked sheet SWITCH button and followTapSwitch; egg path stays BRING BACK."
     status: pending

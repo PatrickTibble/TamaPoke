@@ -201,22 +201,47 @@ static void recoverSwap(Preferences &p) {
   p.remove(FOLLOW_SWAP_KEY);
 }
 
+// A pre-cap save can still hold a sixth member in slot 5. Copy it to the first
+// hole in 0-4, else into the box, and clear slot 5 only after that copy is
+// saved. A fingerprint already in either place means a crash landed between
+// those two writes: clear the leftover, do not copy again. Both full: leave
+// it, so the slot loop can still show the creature and deposit it.
+static void legacySlot5() {
+  if (party.slots[PARTY_CAP].empty()) return;
+  PartyMon m = party.slots[PARTY_CAP];
+  uint32_t fp = followFingerprint(m);
+  for (int i = 0; i < PARTY_CAP; i++)
+    if (followFingerprint(party.slots[i]) == fp) { party.releaseAt(PARTY_CAP); return; }
+  for (int i = 0; i < BOX_SLOTS; i++)
+    if (followFingerprint(party.box[i]) == fp) { party.releaseAt(PARTY_CAP); return; }
+  if (party.add(m) || party.boxAdd(m)) party.releaseAt(PARTY_CAP);
+}
+
 void followLoad() {
   memset(rec, 0, sizeof(rec));
   recN = 0;
   bool swap = false;
   {
     Preferences p;
-    if (!p.begin("tamapoke", true)) return;
-    loadExt(p);
-    swap = p.isKey(FOLLOW_SWAP_KEY);
-    p.end();
+    if (p.begin("tamapoke", true)) {
+      loadExt(p);
+      swap = p.isKey(FOLLOW_SWAP_KEY);
+      p.end();
+    }
   }
-  if (!swap) return;
-  Preferences p;
-  if (!p.begin("tamapoke", false)) return;
-  recoverSwap(p);
-  p.end();
+  if (swap) {
+    Preferences p;
+    if (p.begin("tamapoke", false)) {
+      recoverSwap(p);
+      p.end();
+    }
+  }
+  legacySlot5();
+}
+
+uint8_t followShownCount() {
+  if (!party.slots[PARTY_CAP].empty()) return party.count();
+  return (uint8_t)(party.count() + 1);
 }
 
 void followSave() {
@@ -277,12 +302,12 @@ bool followSwitch(uint8_t slot) {
 
 // Rows follow the Lang enum: ES, EN, FR, DE, IT, PT. ASCII only.
 static const char *const F_STRINGS[LANG_COUNT][F_COUNT] = {
-  { "CAMBIAR", "APRENDE EL MOVIMIENTO PRIMERO", "AHORA NO" },
-  { "SWITCH", "LEARN THE MOVE FIRST", "NOT NOW" },
-  { "CHANGER", "APPRENDS LE MOUVEMENT", "PAS MAINTENANT" },
-  { "WECHSELN", "LERNE ZUERST DIE ATTACKE", "NICHT JETZT" },
-  { "CAMBIA", "IMPARA PRIMA LA MOSSA", "NON ORA" },
-  { "TROCAR", "APRENDE O GOLPE ANTES", "AGORA NAO" },
+  { "CAMBIAR", "APRENDE EL MOVIMIENTO PRIMERO", "AHORA NO", "SIGUIENDO" },
+  { "SWITCH", "LEARN THE MOVE FIRST", "NOT NOW", "FOLLOWING" },
+  { "CHANGER", "APPRENDS LE MOUVEMENT", "PAS MAINTENANT", "SUIT" },
+  { "WECHSELN", "LERNE ZUERST DIE ATTACKE", "NICHT JETZT", "FOLGT" },
+  { "CAMBIA", "IMPARA PRIMA LA MOSSA", "NON ORA", "SEGUE" },
+  { "TROCAR", "APRENDE O GOLPE ANTES", "AGORA NAO", "SEGUE" },
 };
 
 const char *FT(FollowStr id) {

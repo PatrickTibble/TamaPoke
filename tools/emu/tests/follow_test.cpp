@@ -459,6 +459,121 @@ int main() {
        "FOLLOW 1 switches slot 1");
   }
 
+  // --- cap of 5 banked. Slot 5 is not a free slot. Putting firstFree's loop
+  // bound back to PARTY_SLOTS makes add() succeed here, and these checks fail.
+  {
+    wipe();
+    for (int i = 1; i < PARTY_CAP; i++) party.replaceAt(i, mk(10 + i, 20, 5));
+    party.slots[PARTY_CAP] = mk(77, 20, 9);
+    ck(party.count() == PARTY_CAP && party.firstFree() == 0 && !party.isFull(),
+       "a leftover in slot 5 does not fill the party");
+    ck(followShownCount() == party.count(), "a stuck slot 5 is not counted a second time");
+    wipe();
+    for (int i = 0; i < PARTY_CAP; i++) party.replaceAt(i, mk(10 + i, 20, 5));
+    ck(party.slots[PARTY_CAP].empty() && party.isFull() && party.firstFree() < 0,
+       "5 banked fills the cap");
+    ck(followShownCount() == 6, "five banked plus the follower reads 6");
+    PartyMon neu = mk(99, 12, 4);
+    bool toParty = party.add(neu);
+    bool toBox = toParty ? false : party.boxAdd(neu);
+    ck(!toParty && toBox && party.box[0].dex == 99 && party.slots[PARTY_CAP].empty(),
+       "5 banked: add() falls through to the box");
+    party.box[1] = mk(80, 15, 3);
+    party.boxSave();
+    int free = party.firstFree();
+    if (free >= 0) party.swapPartyBox((uint8_t)free, 1);
+    ck(free < 0 && party.box[1].dex == 80, "5 banked: box TO PARTY is refused");
+    wipe();
+    for (int i = 0; i < PARTY_CAP - 1; i++) party.replaceAt(i, mk(10 + i, 20, 5));
+    ck(followShownCount() == 5, "four banked plus the follower reads 5");
+    neu = mk(99, 12, 4);
+    ck(party.add(neu) && party.slots[4].dex == 99 && party.slots[PARTY_CAP].empty(),
+       "4 banked: add() succeeds");
+    party.releaseAt(4);
+    party.box[0] = mk(80, 15, 3);
+    party.boxSave();
+    free = party.firstFree();
+    ck(free == 4, "the free slot is the last banked one");
+    if (free >= 0) party.swapPartyBox((uint8_t)free, 0);
+    ck(party.slots[4].dex == 80 && party.box[0].empty() && party.slots[PARTY_CAP].empty(),
+       "4 banked: box TO PARTY succeeds");
+  }
+
+  // --- a legacy sixth member moves once, and a crash between the copy and
+  // the clear leaves exactly one. Totals do not change on the move itself.
+  {
+    auto occupants = []() {
+      int n = 0;
+      for (int i = 0; i < PARTY_SLOTS; i++) if (!party.slots[i].empty()) n++;
+      for (int i = 0; i < BOX_SLOTS; i++) if (!party.box[i].empty()) n++;
+      return n;
+    };
+    auto plant = [](PartyMon *slots, PartyMon *box) {
+      nvs().clear();
+      Preferences p;
+      p.begin("tamapoke", false);
+      p.putBytes("party", slots, sizeof(PartyMon) * PARTY_SLOTS);
+      if (box) p.putBytes("box", box, sizeof(PartyMon) * BOX_SLOTS);
+      p.end();
+      party.begin();
+    };
+    PartyMon slots[PARTY_SLOTS];
+    PartyMon box[BOX_SLOTS];
+    for (int i = 0; i < PARTY_SLOTS; i++) slots[i] = mk(30 + i, 10 + i, 5);
+    slots[2] = PartyMon();
+    plant(slots, nullptr);
+    int before = occupants();
+    int16_t sixth = 35;
+    ck(party.slots[5].dex == sixth && party.slots[2].empty(), "the sixth starts in slot 5 with a hole behind it");
+    followLoad();
+    party.begin();
+    ck(occupants() == before && party.slots[2].dex == sixth && party.slots[5].empty()
+       && party.slots[0].dex == 30 && party.slots[4].dex == 34,
+       "a hole in 0-4 receives the sixth, and the total is unchanged");
+
+    for (int i = 0; i < PARTY_SLOTS; i++) slots[i] = mk(30 + i, 10 + i, 5);
+    plant(slots, nullptr);
+    before = occupants();
+    followLoad();
+    party.begin();
+    ck(occupants() == before && party.slots[5].empty() && party.box[0].dex == sixth
+       && party.slots[4].dex == 34 && party.boxCount() == 1,
+       "with no hole it goes to the box, and the total is unchanged");
+
+    for (int i = 0; i < PARTY_SLOTS; i++) slots[i] = mk(30 + i, 10 + i, 5);
+    for (int i = 0; i < BOX_SLOTS; i++) box[i] = mk(100 + i, 8, 4);
+    plant(slots, box);
+    before = occupants();
+    followLoad();
+    party.begin();
+    ck(before == PARTY_SLOTS + BOX_SLOTS && occupants() == before && party.slots[5].dex == sixth,
+       "party and box both full: the sixth stays, and the total is unchanged");
+
+    memset(slots, 0, sizeof(slots));
+    slots[1] = slots[5] = mk(50, 22, 7);
+    plant(slots, nullptr);
+    ck(occupants() == 2, "the crash left the copy and slot 5 both occupied");
+    followLoad();
+    party.begin();
+    int n = 0;
+    for (int i = 0; i < PARTY_SLOTS; i++) if (party.slots[i].dex == 50) n++;
+    for (int i = 0; i < BOX_SLOTS; i++) if (party.box[i].dex == 50) n++;
+    ck(n == 1 && party.slots[5].empty() && party.slots[1].dex == 50 && occupants() == 1,
+       "a crash between copy and clear leaves exactly one copy");
+
+    memset(slots, 0, sizeof(slots));
+    memset(box, 0, sizeof(box));
+    slots[5] = box[3] = mk(51, 22, 8);
+    plant(slots, box);
+    followLoad();
+    party.begin();
+    n = 0;
+    for (int i = 0; i < PARTY_SLOTS; i++) if (party.slots[i].dex == 51) n++;
+    for (int i = 0; i < BOX_SLOTS; i++) if (party.box[i].dex == 51) n++;
+    ck(n == 1 && party.slots[5].empty() && party.box[3].dex == 51 && party.count() == 0,
+       "the same crash after a box copy does not put a second one in the party");
+  }
+
   printf("%s\n", bad ? "FAILURES" : "all good");
   return bad ? 1 : 0;
 }

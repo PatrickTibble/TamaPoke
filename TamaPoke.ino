@@ -1530,6 +1530,7 @@ void partyTap(int16_t x, int16_t y) {
     sfxPlay(SFX_TAP);
     return;
   }
+  if (followCellTap(x, y)) return;  // FORK(follow)
   for (int i = 0; i < PARTY_SLOTS; i++) {
     int cx0 = PARTY_GRID_X + (i % 2) * (PARTY_CELL_W + 10);
     int cy0 = PARTY_GRID_Y + (i / 2) * (PARTY_CELL_H + 8);
@@ -4229,7 +4230,7 @@ static void renderPlayerBadges() {
   snprintf(l, sizeof(l), T(S_POKEDEX_FMT), pet.registeredCount(), DEX_COUNT);
   gfx->setCursor(CX - (int)strlen(l) * 6, 312);
   gfx->print(l);
-  snprintf(l, sizeof(l), T(S_PARTY_FMT), party.count());
+  snprintf(l, sizeof(l), T(S_PARTY_FMT), followShownCount());  // FORK(follow)
   gfx->setCursor(CX - (int)strlen(l) * 6, 338);
   gfx->print(l);
 }
@@ -5452,7 +5453,7 @@ void renderParty() {
   gfx->fillCircle(CX, CY, 231, UI_BG_DAY);
 
   char head[24];
-  snprintf(head, sizeof(head), T(S_PARTY_FMT), party.count());
+  snprintf(head, sizeof(head), T(S_PARTY_FMT), followShownCount());  // FORK(follow)
   gfx->setTextColor(UI_INK);
   gfx->setTextSize(3);
   gfx->setCursor(CX - (int)strlen(head) * 9, 42);
@@ -5497,6 +5498,7 @@ void renderParty() {
     int y = PARTY_GRID_Y + (i / 2) * (PARTY_CELL_H + 8);
     drawPartySlot(i, x, y);
   }
+  followDrawCell();  // FORK(follow)
 
   // exit: an explicit button, always in the same place
   const char *ex = partyPick ? T(S_PARTY_LETGO) : T(S_CLOSE);
@@ -6320,3 +6322,4 @@ void drawMap(const char *const *map, int n, int x, int y, int s, bool silhouette
 }
 
 #include "wild_ui.h"  // FORK(wild): last, so it sees every sketch global
+#include "follow_ui.h"  // FORK(follow)

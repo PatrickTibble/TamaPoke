@@ -14,6 +14,7 @@ enum FollowStr : uint8_t {
   F_SWITCH = 0,
   F_LEARN_FIRST,
   F_NOT_NOW,
+  F_FOLLOWING,
   F_COUNT
 };
 
@@ -51,7 +52,12 @@ uint8_t followStored();
 // the oldest. The newcomer is kept even if it is not in the party yet: the
 // switch banks it on the next line, and followSave prunes only after that.
 void followStore(const FollowExt &e);
-void followLoad();    // reads f_ext; finishes or deletes f_swap; writes nothing if there is no journal
+void followLoad();    // reads f_ext; finishes or deletes f_swap; then moves a legacy slot 5
+// Header total. Slot 5 empty: banked count plus the follower (an egg counts).
+// Slot 5 still occupied: party.count(), so six banked never reads as 7/6.
+uint8_t followShownCount();
+void followDrawCell();                 // cell 5, unless a legacy member still occupies it
+bool followCellTap(int16_t x, int16_t y); // swallows that cell unless the member is still there
 void followSave();    // drops records that match no party or box member, then writes
 // The only answer the sheet, the tap and the serial command share.
 // Success reports F_SWITCH. A pending learn offer reports F_LEARN_FIRST.
