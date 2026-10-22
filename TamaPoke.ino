@@ -30,6 +30,7 @@
 #include "save.h"
 #include "pet.h"
 #include "wild.h"  // FORK(wild)
+#include "follow.h"  // FORK(follow)
 #include "sdmon.h"
 #include "rtcbat.h"
 #include "i18n.h"
@@ -689,6 +690,7 @@ void setup() {
 
   party.begin();
   pet.begin();
+  followLoad();  // FORK(follow)
   wildLoad();  // FORK(wild)
   sdBegin();
   thumbs.load();
@@ -860,6 +862,7 @@ void handleSerial() {
   if (line.length() == 0) return;
   if (sdSerialCommand(line)) return;
   if (wildSerial(line)) return;  // FORK(wild)
+  if (followSerial(line)) return;  // FORK(follow)
 
   if (line == "HATCH") {
     pet.eggTap(); pet.eggTap(); pet.eggTap();
@@ -1228,6 +1231,7 @@ void onSwipeV(int dir) {
   if (movePickOpen) { movePickOpen = false; return; }
   if (boxOpen) { boxOpen = false; boxSel = 0; return; }   // vertical backs out
   if (partyOpen) {
+    if (followSheetBack()) return;  // FORK(follow)
     if (partyDetail) { partyDetail = 0; return; }
     if (partyPick) { partyPick = false; pet.endedKind = CER_NONE; }
     partyOpen = false;
@@ -1308,6 +1312,8 @@ void renderMonSheet(const PartyMon &m, bool fromBox) {
   bool leftOk = fromBox ? (party.firstFree() >= 0)
                         : (pet.isEgg() && !pet.awaitingStarter());
   const char *leftLbl = fromBox ? T(S_BOX_TAKE) : T(S_REVIVE);
+  const char *leftWhy = fromBox ? T(S_PARTY_FULL) : T(S_REVIVE_EGG);
+  if (!fromBox && !pet.isEgg()) followSheetLeft(partyDetail - 1, &leftOk, &leftLbl, &leftWhy);  // FORK(follow)
   gfx->fillRoundRect(PDET_L_X, PDET_BTN_Y, PDET_L_W, PDET_BTN_H, 10,
                      leftOk ? UI_BAR_OK : UI_TRACK);
   gfx->drawRoundRect(PDET_L_X, PDET_BTN_Y, PDET_L_W, PDET_BTN_H, 10, UI_INK);
@@ -1335,11 +1341,10 @@ void renderMonSheet(const PartyMon &m, bool fromBox) {
   // Above the button there is clear space between it and the stat line, and
   // that is also where the eye is already travelling.
   if (!leftOk) {
-    const char *why = fromBox ? T(S_PARTY_FULL) : T(S_REVIVE_EGG);
     gfx->setTextColor(UI_BAR_WARN);
     gfx->setTextSize(1);
-    gfx->setCursor(CX - (int)strlen(why) * 3, PDET_BTN_Y - 14);
-    gfx->print(why);
+    gfx->setCursor(CX - (int)strlen(leftWhy) * 3, PDET_BTN_Y - 14);
+    gfx->print(leftWhy);
   }
   gfx->setTextColor(UI_TRACK);
   gfx->setTextSize(2);
@@ -1470,6 +1475,7 @@ bool monSheetConfirmTap(int16_t x, int16_t y, bool fromBox) {
 
 void partyTap(int16_t x, int16_t y) {
   if (boxOpen) { boxTap(x, y); return; }
+  if (followTapFarewell(x, y)) return;  // FORK(follow)
   // The SHEET IS CHECKED FIRST, and that is not cosmetic ordering. It covers the
   // whole screen, and its RELEASE button (x240..370, y336..384) lands inside the
   // BOX button's hit area (x138..328, y312..372) below -- so with BOX tested
@@ -1480,6 +1486,7 @@ void partyTap(int16_t x, int16_t y) {
     // or a miss on YES would fall through to the move rows underneath it.
     if (releaseConfirm) { monSheetConfirmTap(x, y, false); return; }
     if (monSheetBtn(x, y, true)) {           // BRING BACK
+      if (!pet.isEgg() && followTapSwitch(partyDetail - 1)) return;  // FORK(follow)
       if (!pet.isEgg() || pet.awaitingStarter()) { sfxPlay(SFX_DENY); return; }
       pet.reviveFrom(party.slots[partyDetail - 1]);
       party.releaseAt(partyDetail - 1);      // it is alive now, not banked
@@ -1527,6 +1534,7 @@ void partyTap(int16_t x, int16_t y) {
     sfxPlay(SFX_TAP);
     return;
   }
+  if (followCellTap(x, y)) return;  // FORK(follow)
   for (int i = 0; i < PARTY_SLOTS; i++) {
     int cx0 = PARTY_GRID_X + (i % 2) * (PARTY_CELL_W + 10);
     int cy0 = PARTY_GRID_Y + (i / 2) * (PARTY_CELL_H + 8);
@@ -1612,6 +1620,7 @@ void onSwipe(int dir) {
     return;
   }
   if (partyOpen) {
+    if (followSheetBack()) return;  // FORK(follow)
     if (partyDetail) { partyDetail = 0; return; }
     if (partyPick) { partyPick = false; pet.endedKind = CER_NONE; }
     partyOpen = false;
@@ -2220,7 +2229,8 @@ void render() {
     if (boxOpen) {
       if (boxDetail) renderBoxDetail();
       else renderBox();
-    } else if (partyDetail) renderPartyDetail();
+    } else if (followSheetUp()) followRenderSheet();  // FORK(follow)
+    else if (partyDetail) renderPartyDetail();
     else renderParty();
     return;
   }
@@ -4226,7 +4236,7 @@ static void renderPlayerBadges() {
   snprintf(l, sizeof(l), T(S_POKEDEX_FMT), pet.registeredCount(), DEX_COUNT);
   gfx->setCursor(CX - (int)strlen(l) * 6, 312);
   gfx->print(l);
-  snprintf(l, sizeof(l), T(S_PARTY_FMT), party.count());
+  snprintf(l, sizeof(l), T(S_PARTY_FMT), followShownCount());  // FORK(follow)
   gfx->setCursor(CX - (int)strlen(l) * 6, 338);
   gfx->print(l);
 }
@@ -5449,7 +5459,7 @@ void renderParty() {
   gfx->fillCircle(CX, CY, 231, UI_BG_DAY);
 
   char head[24];
-  snprintf(head, sizeof(head), T(S_PARTY_FMT), party.count());
+  snprintf(head, sizeof(head), T(S_PARTY_FMT), followShownCount());  // FORK(follow)
   gfx->setTextColor(UI_INK);
   gfx->setTextSize(3);
   gfx->setCursor(CX - (int)strlen(head) * 9, 42);
@@ -5494,6 +5504,7 @@ void renderParty() {
     int y = PARTY_GRID_Y + (i / 2) * (PARTY_CELL_H + 8);
     drawPartySlot(i, x, y);
   }
+  followDrawCell();  // FORK(follow)
 
   // exit: an explicit button, always in the same place
   const char *ex = partyPick ? T(S_PARTY_LETGO) : T(S_CLOSE);
@@ -6317,3 +6328,4 @@ void drawMap(const char *const *map, int n, int x, int y, int s, bool silhouette
 }
 
 #include "wild_ui.h"  // FORK(wild): last, so it sees every sketch global
+#include "follow_ui.h"  // FORK(follow)

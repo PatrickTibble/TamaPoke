@@ -49,12 +49,13 @@ if command -v python3 >/dev/null; then python3 "$ROOT/tools/gen_wild.py" --check
 
 # arrays, not a string: the sprite dir has to reach the compiler still quoted,
 # and passing these through eval silently strips them
-CORE=("$ROOT/gbsynth.cpp" "$ROOT/pet.cpp" "$ROOT/i18n.cpp" "$ROOT/party.cpp" "$ROOT/battle.cpp" "$ROOT/link.cpp" "$ROOT/save.cpp" "$ROOT/wild.cpp")
+CORE=("$ROOT/gbsynth.cpp" "$ROOT/pet.cpp" "$ROOT/i18n.cpp" "$ROOT/party.cpp" "$ROOT/battle.cpp" "$ROOT/link.cpp" "$ROOT/save.cpp" "$ROOT/wild.cpp" "$ROOT/follow.cpp")
 FLAGS=(-std=c++17 -O1 -w -I"$EMU" -I"$ROOT" -DSPRITE_DIR="\"$ROOT/tools/sdcard/mons\"")
 
 # these drive setup()/loop()/render(), so they need the sketch itself
 needs_sketch() { case "$1" in touch_test|flush_test|joy_test|anim_test|swipe_test|lan_test|console_test|hit_test|starter_test|release_test|badgesave_test) return 0;; *) return 1;; esac; }
 eval "up_$(declare -f needs_sketch)"; needs_sketch() { [ "$1" = wild_ui_test ] || up_needs_sketch "$1"; }  # FORK(wild)
+eval "upf_$(declare -f needs_sketch)"; needs_sketch() { [ "$1" = follow_ui_test ] || upf_needs_sketch "$1"; }  # FORK(follow)
 
 # and these are standalone: gbsynth.cpp has no Arduino dependency at all, which
 # is the point of it -- linking the game core in would only demand stubs for

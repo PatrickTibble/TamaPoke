@@ -9,6 +9,7 @@
 // A runaway does not: it is the game's one punishing outcome, and letting a
 // neglected pet come back as a team member would take the sting out of it.
 #define PARTY_SLOTS 6
+#define PARTY_CAP (PARTY_SLOTS - 1) // FORK(follow): slots [0, CAP) bank; index 5 is the follower cell
 // The box: storage beyond the six that fight. Deliberately a SEPARATE NVS key
 // rather than a bigger party blob -- growing that blob would change its stride
 // and the length-based migration in begin() cannot tell a stride change from a
@@ -43,8 +44,8 @@ public:
 
   void begin();                 // load from NVS
   uint8_t count() const;
-  bool isFull() const { return count() >= PARTY_SLOTS; }
-  int firstFree() const;        // index of the first empty slot, -1 if full
+  bool isFull() const { return firstFree() < 0; } // FORK(follow): same slots as firstFree
+  int firstFree() const;        // first empty slot in [0, PARTY_CAP), -1 if that range is full
   bool add(const PartyMon &m);  // into the first free slot; false if full
   void replaceAt(uint8_t i, const PartyMon &m);
   void releaseAt(uint8_t i);    // free a slot again
