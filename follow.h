@@ -39,6 +39,7 @@ struct FollowSnap {
 class Pet;
 struct FollowIO {
   static void capture(const Pet &p, FollowExt &e);
+  static void apply(Pet &p, const PartyMon &m, const FollowExt &e);
 };
 
 uint32_t followFingerprint(const PartyMon &m);   // 0 if empty; never 0 for a real mon
@@ -52,4 +53,12 @@ uint8_t followStored();
 void followStore(const FollowExt &e);
 void followLoad();    // reads f_ext; finishes or deletes f_swap; writes nothing if there is no journal
 void followSave();    // drops records that match no party or box member, then writes
+// The only answer the sheet, the tap and the serial command share.
+// Success reports F_SWITCH. A pending learn offer reports F_LEARN_FIRST.
+// Every other refusal reports F_NOT_NOW. Asleep is allowed. reason may be null.
+bool followCanSwitch(uint8_t slot, FollowStr *reason);
+// f_swap (slot + outgoing), then saveNow of the incoming creature, then
+// replaceAt, then f_ext, then delete f_swap. A refusal writes nothing.
+bool followSwitch(uint8_t slot);
+bool followSerial(const String &line);   // FOLLOW lists records; FOLLOW <1-6> switches
 const char *FT(FollowStr id);

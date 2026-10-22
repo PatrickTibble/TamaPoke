@@ -1,4 +1,4 @@
-// Follower care records. Nothing here switches a creature or draws a screen.
+// Follower care records and the journalled switch. Nothing here draws a screen.
 // Every "never" check has a companion that shows the mechanism engaged.
 #include "Arduino.h"
 #include "Preferences.h"
@@ -12,7 +12,8 @@
 #include <vector>
 uint32_t g_seed=41; FakeSerial Serial; FakeESP ESP; FakeWire Wire;
 volatile int g_touchX=0,g_touchY=0; volatile bool g_touchDown=false; bool wasPressed=false;
-uint32_t millis(){return 0;} void FakeESP::restart(){exit(0);}
+static uint32_t g_ms=0; uint32_t millis(){return g_ms;} void FakeESP::restart(){exit(0);}
+extern Pet pet;
 int FakeSerial::available(){return 0;} String FakeSerial::readStringUntil(char){return String("");}
 void sfxPlay(uint8_t){}
 static int bad=0;
@@ -31,6 +32,58 @@ static void wipe() {
   nvs().clear();
   party.begin();
   followLoad();
+}
+
+static void boot(int16_t dex) {
+  nvs().clear();
+  party.begin();
+  pet.begin();
+  followLoad();
+  if (dex > 0) pet.dbgHatchAs(dex, false);
+  pet.learnQCount = 0;
+  pet.ceremony = CER_NONE;
+  pet.sleeping = false;
+  pet.frozen = false;
+}
+
+static bool hasSwap() {
+  Preferences p;
+  if (!p.begin("tamapoke", true)) return false;
+  bool y = p.isKey(FOLLOW_SWAP_KEY);
+  p.end();
+  return y;
+}
+
+static int copiesOf(int16_t dex) {
+  int n = (!pet.isEgg() && pet.speciesId == dex) ? 1 : 0;
+  for (int i = 0; i < PARTY_SLOTS; i++) if (party.slots[i].dex == dex) n++;
+  for (int i = 0; i < BOX_SLOTS; i++) if (party.box[i].dex == dex) n++;
+  return n;
+}
+
+static void plantSwap(uint8_t slot, const PartyMon &out) {
+  uint8_t buf[1 + sizeof(PartyMon)];
+  buf[0] = slot;
+  memcpy(buf + 1, &out, sizeof(out));
+  Preferences p;
+  p.begin("tamapoke", false);
+  p.putBytes(FOLLOW_SWAP_KEY, buf, sizeof(buf));
+  p.end();
+}
+
+// Refusal must not move the follower. The companion call site switches afterwards.
+static bool refused(uint8_t slot, FollowStr expect) {
+  FollowStr why = F_SWITCH;
+  int16_t was = pet.speciesId;
+  bool egg = pet.isEgg();
+  return !followCanSwitch(slot, &why) && why == expect && !followSwitch(slot)
+      && pet.speciesId == was && pet.isEgg() == egg && !hasSwap();
+}
+
+static bool switchedTo(uint8_t slot) {
+  int16_t want = party.slots[slot].dex;
+  if (want < 1 || !followSwitch(slot)) return false;
+  return pet.speciesId == want && !pet.frozen && !pet.sleeping && !hasSwap();
 }
 
 int main() {
@@ -161,6 +214,249 @@ int main() {
     }
     gLang = was;
     ck(ok, "every FT() string is non-null and ASCII in all 6 languages");
+  }
+
+  // --- round trip: A's care comes back from the ext record, not from its level
+  {
+    boot(6);
+    const uint32_t age = 40u * MINUTES_PER_LEVEL + 17;
+    pet.ageMinutes = age;
+    pet.bond = 42;
+    pet.fullness = 61; pet.joy = 55; pet.energy = 70; pet.hygiene = 90;
+    pet.poops = 2; pet.weight = 40; pet.careMistakes = 4; pet.berryKnown = true;
+    pet.ivAtk = 21; pet.ivDef = 22; pet.ivSpe = 23; pet.ivHp = 24;
+    pet.trAtk = 5; pet.trDef = 6; pet.trSpe = 7;
+    pet.moves[0] = 3; pet.moves[1] = 6; pet.moves[2] = 9; pet.moves[3] = 12;
+    pet.medals = 0x15;
+    pet.lastLearnLevel = 33;
+    snprintf(pet.nick, sizeof(pet.nick), "ACE");
+    pet.badges = 0x2A;
+    PartyMon b = mk(25, 18, 11);
+    FollowExt be = followFallback(b);
+    be.bond = 4;
+    be.ageMinutes = 10u * MINUTES_PER_LEVEL + 3;
+    be.lastLearnLevel = 255;
+    be.fullness = 77;
+    party.replaceAt(0, b);
+    followStore(be);
+    uint32_t aFp = followFingerprint(followSnapshot(pet).mon);
+    ck(followSwitch(0), "switch A out for B");
+    ck(pet.speciesId == 25 && pet.bond == 4 && pet.fullness == 77, "B arrives with its ext, not a fresh revive");
+    ck(pet.lastLearnLevel == 255 && !pet.frozen && !pet.sleeping, "B is an awake follower");
+    ck(party.slots[0].dex == 6 && !strcmp(party.slots[0].nick, "ACE"), "A is banked with its nick");
+    ck(party.slots[0].moves[0] == 3 && party.slots[0].ivAtk == 21 && party.slots[0].level == 41,
+       "A's banked level is the level it left at");
+    FollowExt got;
+    ck(followFind(aFp, got) && got.bond == 42 && got.ageMinutes == age && got.lastLearnLevel == 33,
+       "A's ext is what was snapshotted, not the fallback");
+    uint32_t bAge = pet.ageMinutes;
+    pet.dbgTick();
+    ck(pet.ageMinutes == bAge + 1, "ticking moves the follower");
+    ck(followFind(aFp, got) && got.ageMinutes == age && got.bond == 42, "and leaves the banked ext where it was");
+    ck(followSwitch(0), "switch A back");
+    bool back = pet.speciesId == 6 && pet.ageMinutes == age && pet.bond == 42
+        && pet.fullness == 61 && pet.joy == 55 && pet.energy == 70 && pet.hygiene == 90
+        && pet.poops == 2 && pet.weight == 40 && pet.careMistakes == 4 && pet.berryKnown
+        && pet.ivAtk == 21 && pet.ivDef == 22 && pet.ivSpe == 23 && pet.ivHp == 24
+        && pet.trAtk == 5 && pet.trDef == 6 && pet.trSpe == 7
+        && pet.moves[0] == 3 && pet.moves[1] == 6 && pet.moves[2] == 9 && pet.moves[3] == 12
+        && !strcmp(pet.nick, "ACE") && pet.medals == 0x15 && pet.lastLearnLevel == 33
+        && !pet.frozen && pet.badges == 0x2A && !hasSwap();
+    ck(back, "A's age, bond, stats, mistakes, moves, nick and IVs match");
+    ck(party.slots[0].dex == 25, "B is the one left in the slot");
+  }
+
+  // --- a banked creature does not age while the follower does
+  {
+    boot(1);
+    pet.ageMinutes = 1000;
+    pet.lastLearnLevel = 255;
+    PartyMon m = mk(16, 22, 8);
+    party.replaceAt(0, m);
+    FollowExt e = followFallback(m);
+    e.ageMinutes = 99999;
+    e.bond = 77;
+    e.fullness = 13;
+    followStore(e);
+    followSave();
+    FollowExt before;
+    ck(followFind(e.fingerprint, before), "the banked record is stored");
+    for (int i = 0; i < 600; i++) pet.dbgTick();
+    const uint32_t epoch = 1700000000UL;
+    pet.dbgSetSeen(epoch);
+    pet.syncClock(epoch + 14UL * 24 * 60 * 60);
+    followLoad();
+    FollowExt after;
+    ck(followFind(e.fingerprint, after) && memcmp(&before, &after, sizeof(before)) == 0,
+       "600 ticks and two weeks leave the banked ext untouched");
+    ck(party.slots[0].level == 22 && party.slots[0].dex == 16, "and the banked level stays put");
+    ck(pet.ageMinutes == 1000u + 600u + 14UL * 24 * 60, "the follower's age moves");
+  }
+
+  // --- each refusal, then the same slot switching once the reason is gone
+  {
+    boot(25);
+    pet.newEgg();
+    party.replaceAt(0, mk(1, 8, 4));
+    ck(pet.isEgg() && !pet.awaitingStarter(), "an egg after the first creature is not the starter pick");
+    ck(refused(0, F_NOT_NOW), "an egg cannot switch");
+    pet.dbgHatchAs(4, false);
+    pet.learnQCount = 0;
+    ck(switchedTo(0), "the same slot switches once the egg has hatched");
+  }
+  {
+    boot(0);
+    pet.speciesId = 25;
+    party.replaceAt(0, mk(1, 8, 4));
+    ck(!pet.isEgg() && pet.awaitingStarter(), "the starter pick can be the thing refusing");
+    ck(refused(0, F_NOT_NOW), "choosing a starter refuses");
+    pet.chooseStarter(4);
+    pet.learnQCount = 0;
+    ck(!pet.awaitingStarter() && switchedTo(0), "once the starter is chosen the same slot switches");
+  }
+  {
+    boot(4);
+    party.replaceAt(0, mk(7, 9, 5));
+    pet.ceremony = CER_FAREWELL;
+    ck(refused(0, F_NOT_NOW), "a ceremony refuses");
+    pet.ceremony = CER_NONE;
+    ck(switchedTo(0), "the same slot switches once the ceremony is over");
+  }
+  {
+    boot(4);
+    party.replaceAt(0, mk(7, 9, 5));
+    pet.learnQCount = 1;
+    pet.learnQueue[0] = 3;
+    ck(refused(0, F_LEARN_FIRST), "a learn offer refuses with its own reason");
+    pet.learnQCount = 0;
+    ck(switchedTo(0), "the same slot switches once the move is dealt with");
+  }
+  {
+    boot(4);
+    ck(party.slots[0].empty() && refused(0, F_NOT_NOW), "an empty slot refuses");
+    party.replaceAt(0, mk(7, 9, 5));
+    ck(switchedTo(0), "filling that slot lets the switch through");
+  }
+  {
+    boot(4);
+    party.replaceAt(0, mk(7, 9, 5));
+    ck(refused(9, F_NOT_NOW), "a slot past the party refuses");
+    ck(switchedTo(0), "a real slot still switches");
+  }
+  {
+    boot(4);
+    pet.ageMinutes = 39u * MINUTES_PER_LEVEL;
+    pet.fullness = pet.joy = pet.energy = pet.hygiene = 80;
+    pet.careMistakes = 0;
+    party.replaceAt(0, mk(7, 9, 5));
+    int16_t before = pet.speciesId;
+    ck(pet.canEvolveNow(), "the evolution refusal has a creature that can evolve");
+    g_ms = 0;
+    pet.evolve();
+    ck(pet.evolving() && pet.speciesId != before, "the animation is actually running");
+    ck(refused(0, F_NOT_NOW), "the evolution animation refuses");
+    // evolveUntil is private and sticks on this Pet. Later boots must stay
+    // past it, or every switch looks refused for the wrong reason.
+    g_ms = 100000;
+    pet.learnQCount = 0;
+    ck(!pet.evolving() && switchedTo(0), "once the animation ends the same slot switches");
+  }
+  {
+    boot(4);
+    party.replaceAt(0, mk(7, 9, 5));
+    pet.sleeping = true;
+    FollowStr why = F_NOT_NOW;
+    ck(followCanSwitch(0, &why) && why == F_SWITCH, "asleep is allowed");
+    ck(switchedTo(0), "and the creature that comes in is awake");
+  }
+
+  // --- the record follows the creature through the box and a move edit
+  {
+    boot(1);
+    PartyMon m = mk(25, 30, 12);
+    m.moves[0] = 3;
+    party.replaceAt(2, m);
+    FollowExt e = followFallback(m);
+    e.bond = 55;
+    e.ageMinutes = 29u * MINUTES_PER_LEVEL + 9;
+    e.lastLearnLevel = 255;
+    e.fullness = 61;
+    followStore(e);
+    uint32_t fp = e.fingerprint;
+    party.swapPartyBox(2, 0);
+    FollowExt got;
+    ck(party.slots[2].empty() && followFind(followFingerprint(party.box[0]), got) && got.bond == 55,
+       "a deposit keeps the record");
+    party.box[0].moves[0] = 14;
+    party.box[0].moves[1] = 8;
+    party.boxSave();
+    ck(followFingerprint(party.box[0]) == fp && followFind(fp, got) && got.bond == 55,
+       "a move edit keeps the record");
+    party.swapPartyBox(2, 0);
+    ck(followSwitch(2) && pet.speciesId == 25 && pet.bond == 55
+       && pet.ageMinutes == 29u * MINUTES_PER_LEVEL + 9 && pet.moves[0] == 14 && pet.fullness == 61,
+       "withdraw then switch restores that record");
+  }
+
+  // --- a frozen follower comes back as a normal one
+  {
+    boot(6);
+    pet.frozen = true;
+    pet.bond = 9;
+    pet.ageMinutes = 50u * MINUTES_PER_LEVEL + 3;
+    pet.lastLearnLevel = 255;
+    party.replaceAt(0, mk(25, 12, 8));
+    FollowExt b = followFallback(party.slots[0]);
+    b.bond = 4;
+    b.lastLearnLevel = 255;
+    followStore(b);
+    ck(followSwitch(0) && pet.speciesId == 25 && !pet.frozen, "a frozen follower can leave");
+    ck(followSwitch(0) && pet.speciesId == 6 && !pet.frozen && pet.bond == 9,
+       "switched out and back, frozen is clear and the bond came back");
+  }
+
+  // --- both crash points. The journal is planted, which is all the next boot sees.
+  {
+    boot(4);
+    pet.ageMinutes = 20u * MINUTES_PER_LEVEL;
+    pet.ivAtk = 11; pet.ivDef = 12; pet.ivSpe = 13; pet.ivHp = 14;
+    snprintf(pet.nick, sizeof(pet.nick), "IN");
+    party.replaceAt(0, followSnapshot(pet).mon);
+    PartyMon outgoing = mk(7, 15, 9);
+    plantSwap(0, outgoing);
+    ck(copiesOf(4) == 2 && copiesOf(7) == 0, "the crash is after the pet was saved and before replaceAt");
+    followLoad();
+    ck(pet.speciesId == 4 && party.slots[0].dex == 7, "recovery finishes replaceAt");
+    ck(copiesOf(4) == 1 && copiesOf(7) == 1, "no duplicate and no loss");
+    ck(!hasSwap(), "and the journal is deleted");
+    followLoad();
+    ck(pet.speciesId == 4 && party.slots[0].dex == 7, "the next boot leaves them where they landed");
+  }
+  {
+    boot(4);
+    snprintf(pet.nick, sizeof(pet.nick), "OUT");
+    party.replaceAt(0, mk(7, 15, 9));
+    plantSwap(0, followSnapshot(pet).mon);
+    ck(copiesOf(4) == 1 && copiesOf(7) == 1, "the crash is before the pet was saved");
+    followLoad();
+    ck(pet.speciesId == 4 && party.slots[0].dex == 7, "recovery deletes the journal and changes nothing");
+    ck(copiesOf(4) == 1 && copiesOf(7) == 1, "no duplicate and no loss");
+    ck(!hasSwap(), "the journal is gone");
+  }
+
+  // --- FOLLOW lists, and FOLLOW <1-6> is the same switch
+  {
+    boot(4);
+    party.replaceAt(0, mk(7, 10, 5));
+    FollowExt e = followFallback(party.slots[0]);
+    e.bond = 8;
+    e.lastLearnLevel = 255;
+    followStore(e);
+    ck(followSerial(String("NOPE")) == false, "an unrelated line is not a FOLLOW command");
+    ck(followSerial(String("FOLLOW")) && pet.speciesId == 4, "FOLLOW alone does not switch");
+    ck(followSerial(String("FOLLOW 2")) && pet.speciesId == 4, "an empty FOLLOW slot refuses");
+    ck(followSerial(String("FOLLOW 1")) && pet.speciesId == 7 && pet.bond == 8 && !hasSwap(),
+       "FOLLOW 1 switches slot 1");
   }
 
   printf("%s\n", bad ? "FAILURES" : "all good");

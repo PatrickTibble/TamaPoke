@@ -862,6 +862,7 @@ void handleSerial() {
   if (line.length() == 0) return;
   if (sdSerialCommand(line)) return;
   if (wildSerial(line)) return;  // FORK(wild)
+  if (followSerial(line)) return;  // FORK(follow)
 
   if (line == "HATCH") {
     pet.eggTap(); pet.eggTap(); pet.eggTap();

@@ -49,6 +49,41 @@ void FollowIO::capture(const Pet &p, FollowExt &e) {
   e.goodTicks = p.goodTicks;
 }
 
+void FollowIO::apply(Pet &p, const PartyMon &m, const FollowExt &e) {
+  p.speciesId = m.dex;
+  p.prevSpeciesId = -1;
+  p.shiny = m.shiny != 0;
+  p.ivAtk = m.ivAtk; p.ivDef = m.ivDef; p.ivSpe = m.ivSpe; p.ivHp = m.ivHp;
+  p.trAtk = m.trAtk; p.trDef = m.trDef; p.trSpe = m.trSpe;
+  memcpy(p.moves, m.moves, sizeof(p.moves));
+  p.medals = m.medals;
+  strncpy(p.nick, m.nick, sizeof(p.nick) - 1);
+  p.nick[sizeof(p.nick) - 1] = 0;
+  p.ageMinutes = e.ageMinutes;
+  p.farDeclinedAge = e.farDeclinedAge;
+  p.fullness = e.fullness;
+  p.joy = e.joy;
+  p.energy = e.energy;
+  p.hygiene = e.hygiene;
+  p.poops = e.poops;
+  p.weight = e.weight;
+  p.bond = e.bond;
+  p.careMistakes = e.careMistakes;
+  p.mistakeCooldown = e.mistakeCooldown;
+  p.neglectTicks = e.neglectTicks;
+  p.evoPen = e.evoPen;
+  p.evoDeclinedLv = e.evoDeclinedLv;
+  p.lastLearnLevel = e.lastLearnLevel;
+  p.berryKnown = e.berryKnown != 0;
+  p.goodTicks = e.goodTicks;
+  p.bondToday = 0;
+  p.frozen = false;
+  p.sleeping = false;
+  p.learnQCount = 0;
+  memset(p.learnQueue, 0, sizeof(p.learnQueue));
+  p.registerSpecies(p.speciesId);
+}
+
 FollowSnap followSnapshot(const Pet &p) {
   FollowSnap s;
   memset(&s, 0, sizeof(s));
@@ -196,6 +231,50 @@ void followSave() {
   p.end();
 }
 
+bool followCanSwitch(uint8_t slot, FollowStr *reason) {
+  FollowStr why = F_SWITCH;
+  if (pet.isEgg() || pet.ceremony || pet.evolving() || pet.awaitingStarter())
+    why = F_NOT_NOW;
+  else if (pet.hasLearnOffer())
+    why = F_LEARN_FIRST;
+  else if (slot >= PARTY_SLOTS || party.slots[slot].empty())
+    why = F_NOT_NOW;
+  if (reason) *reason = why;
+  return why == F_SWITCH;
+}
+
+// f_swap is written before the pet or the party changes, so a crash either
+// still has the old follower (delete the journal) or already saved the new
+// one (finish replaceAt). The outgoing care record is stored before
+// followSave, which only then drops the creature that just left the party.
+bool followSwitch(uint8_t slot) {
+  if (!followCanSwitch(slot, 0)) return false;
+  FollowSnap out = followSnapshot(pet);
+  if (out.mon.empty()) return false;
+  PartyMon incoming = party.slots[slot];
+  FollowExt ext;
+  if (!followFind(followFingerprint(incoming), ext)) ext = followFallback(incoming);
+  {
+    Preferences p;
+    if (!p.begin("tamapoke", false)) return false;
+    uint8_t buf[1 + sizeof(PartyMon)];
+    buf[0] = slot;
+    memcpy(buf + 1, &out.mon, sizeof(out.mon));
+    p.putBytes(FOLLOW_SWAP_KEY, buf, sizeof(buf));
+    p.end();
+  }
+  FollowIO::apply(pet, incoming, ext);
+  pet.saveNow();
+  followStore(out.ext);
+  party.replaceAt(slot, out.mon);
+  followSave();
+  Preferences p;
+  if (!p.begin("tamapoke", false)) return true;
+  p.remove(FOLLOW_SWAP_KEY);
+  p.end();
+  return true;
+}
+
 // Rows follow the Lang enum: ES, EN, FR, DE, IT, PT. ASCII only.
 static const char *const F_STRINGS[LANG_COUNT][F_COUNT] = {
   { "CAMBIAR", "APRENDE EL MOVIMIENTO PRIMERO", "AHORA NO" },
@@ -211,4 +290,31 @@ const char *FT(FollowStr id) {
   uint8_t l = gLang < LANG_COUNT ? (uint8_t)gLang : (uint8_t)LANG_EN;
   const char *s = F_STRINGS[l][id];
   return s ? s : "";
+}
+
+bool followSerial(const String &line) {
+  if (line != "FOLLOW" && !line.startsWith("FOLLOW ")) return false;
+  String rest = line.substring(6);
+  rest.trim();
+  if (!rest.length()) {
+    Serial.printf("follow: %u\n", recN);
+    for (uint8_t i = 0; i < recN; i++)
+      Serial.printf("#%u age=%lu bond=%u\n", i,
+                    (unsigned long)rec[i].ageMinutes, rec[i].bond);
+    return true;
+  }
+  long n = rest.toInt();
+  if (n < 1 || n > PARTY_SLOTS) {
+    Serial.println("follow: slot 1-6");
+    return true;
+  }
+  uint8_t slot = (uint8_t)(n - 1);
+  if (!followSwitch(slot)) {
+    FollowStr why = F_NOT_NOW;
+    followCanSwitch(slot, &why);
+    Serial.printf("follow: %s\n", FT(why));
+    return true;
+  }
+  Serial.printf("follow: #%d\n", pet.speciesId);
+  return true;
 }
