@@ -1,5 +1,6 @@
-// Party header and follower cell. Driven through render() and partyTap() so the
-// FORK(follow) hooks are what gets tested. Fresh screen state before each check.
+// Party header, follower cell, and the banked sheet's SWITCH button. Driven
+// through render() and partyTap() so the FORK(follow) hooks are what gets tested.
+// Fresh screen state before each check.
 #include "Arduino.h"
 #include "Arduino_GFX_Library.h"
 #include "Preferences.h"
@@ -74,6 +75,7 @@ static PartyMon mon(int dex, int lvl, const char *nick) {
 #define CELL_H 70
 static void tapCell(int i) { partyTap(CELL_X(i) + CELL_W / 2, CELL_Y(i) + CELL_H / 2); }
 
+static uint16_t pix(int x, int y) { return gfx->buffer()[y * gfx->_w + x]; }
 static bool glyphAt(int x, int y, char ch, int size, uint16_t col) {
   const uint16_t *fb = gfx->buffer();
   int w = gfx->_w, h = gfx->_h;
@@ -197,6 +199,80 @@ int main() {
   tapCell(0);
   ck(party.slots[0].dex == 143 && !partyPick && party.slots[5].empty(),
      "and cell 1 still takes the newcomer");
+
+  // Hatched follower: the sheet's left button is SWITCH. An egg keeps BRING BACK.
+  emptyParty();
+  party.replaceAt(0, mon(1, 10, "BULBA"));
+  pet.learnQCount = 1;
+  clearScreens();
+  partyOpen = true;
+  partyDetail = 1;
+  gfx->frameReady = false;
+  render();
+  if (on("party")) {
+    ck(gfx->frameReady, "the sheet flushes");
+    ck(pix(90, 344) == UI_TRACK, "a refused SWITCH is grey");
+    ck(see("SWITCH", 2, 0x8410, 70, 336, 250, 384), "and its label is SWITCH");
+    ck(see("LEARN THE MOVE FIRST", 1, UI_BAR_WARN, 0, 308, gfx->_w, 336),
+       "with the reason above it");
+    ck(!see("BRING BACK", 2, 0x8410, 70, 336, 250, 384),
+       "and not BRING BACK");
+  }
+  int16_t live = pet.speciesId;
+  partyTap(233, 360);
+  ck(pet.speciesId == live && partyDetail == 1 && partyOpen,
+     "that tap does not switch, and the sheet stays up");
+
+  pet.learnQCount = 0;
+  gfx->frameReady = false;
+  render();
+  if (on("party")) {
+    ck(pix(90, 344) == UI_BAR_OK, "SWITCH lights up once the offer is cleared");
+    ck(see("SWITCH", 2, UI_BG_DAY, 70, 336, 250, 384), "in the enabled colour");
+  }
+  partyTap(320, 360);
+  ck(releaseConfirm && pet.speciesId == live && party.slots[0].dex == 1,
+     "RELEASE still asks, and does not switch");
+  releaseConfirm = false;
+  partyTap(233, 360);
+  ck(pet.speciesId == 1, "the centre tap switches to the banked creature");
+  ck(party.slots[0].dex == live, "and banks the follower in that slot");
+  ck(!partyOpen && partyDetail == 0, "the sheet and the party close");
+  on("main");
+
+  if (!pet.isEgg()) pet.newEgg();
+  partyOpen = true;
+  partyDetail = 1;
+  gfx->frameReady = false;
+  render();
+  if (on("party")) {
+    ck(see("BRING BACK", 2, UI_BG_DAY, 70, 336, 250, 384),
+       "an egg still offers BRING BACK");
+    ck(!see("SWITCH", 2, UI_BG_DAY, 70, 336, 250, 384) &&
+       !see("SWITCH", 2, 0x8410, 70, 336, 250, 384),
+       "and not SWITCH");
+  }
+  partyTap(233, 360);
+  ck(pet.speciesId == live && party.slots[0].empty(),
+     "BRING BACK still revives from the centre");
+  ck(!partyOpen && partyDetail == 0, "and closes the sheet");
+  on("main");
+
+  emptyParty();
+  party.box[0] = mon(25, 20, "PIKA");
+  clearScreens();
+  partyOpen = true;
+  boxOpen = true;
+  boxDetail = 1;
+  gfx->frameReady = false;
+  render();
+  if (on("box")) {
+    ck(see("TO PARTY", 2, UI_BG_DAY, 70, 336, 250, 384),
+       "a boxed creature still offers TO PARTY");
+    ck(!see("SWITCH", 2, UI_BG_DAY, 70, 336, 250, 384) &&
+       !see("SWITCH", 2, 0x8410, 70, 336, 250, 384),
+       "and not SWITCH");
+  }
 
   printf("%s\n", bad ? "FAILURES" : "all good");
   return bad ? 1 : 0;

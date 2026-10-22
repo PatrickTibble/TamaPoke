@@ -1,5 +1,6 @@
 #pragma once
-// Follower cell on the party grid. Included once, at the bottom of TamaPoke.ino.
+// Follower cell on the party grid, and SWITCH on a banked sheet.
+// Included once, at the bottom of TamaPoke.ino.
 // followDrawCell / followCellTap are declared in follow.h for the hooks above.
 
 static void followCellXY(int &x, int &y) {
@@ -45,5 +46,28 @@ bool followCellTap(int16_t px, int16_t py) {
   followCellXY(x, y);
   if (px < x || px > x + PARTY_CELL_W || py < y || py > y + PARTY_CELL_H) return false;
   sfxPlay(SFX_TAP);
+  return true;
+}
+
+bool followSheetLeft(uint8_t slot, bool *ok, const char **label, const char **why) {
+  if (pet.isEgg()) return false;
+  FollowStr reason = F_NOT_NOW;
+  bool can = followCanSwitch(slot, &reason);
+  if (ok) *ok = can;
+  if (label) *label = FT(F_SWITCH);
+  if (why) *why = FT(reason);
+  return true;
+}
+
+bool followTapSwitch(uint8_t slot) {
+  if (!followSwitch(slot)) {
+    sfxPlay(SFX_DENY);
+    return true;
+  }
+  partyDetail = 0;
+  releaseConfirm = false;
+  boxSwapFrom = 0;
+  partyOpen = false;
+  sfxPlay(SFX_HATCH);
   return true;
 }

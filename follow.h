@@ -58,6 +58,12 @@ void followLoad();    // reads f_ext; finishes or deletes f_swap; then moves a l
 uint8_t followShownCount();
 void followDrawCell();                 // cell 5, unless a legacy member still occupies it
 bool followCellTap(int16_t x, int16_t y); // swallows that cell unless the member is still there
+// Party sheet, hatched follower only. Writes the left button from followCanSwitch
+// and FT. An egg returns false and leaves the caller's BRING BACK values alone.
+bool followSheetLeft(uint8_t slot, bool *ok, const char **label, const char **why);
+// Left button of that sheet. Success closes the sheet and the party. A refusal
+// buzzes and leaves the sheet up. Returns true once the tap is handled.
+bool followTapSwitch(uint8_t slot);
 void followSave();    // drops records that match no party or box member, then writes
 // The only answer the sheet, the tap and the serial command share.
 // Success reports F_SWITCH. A pending learn offer reports F_LEARN_FIRST.

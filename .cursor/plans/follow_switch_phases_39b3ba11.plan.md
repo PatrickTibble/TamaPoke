@@ -13,7 +13,7 @@ todos:
     status: completed
   - id: phase-4-sheet
     content: "Phase 4: banked sheet SWITCH button and followTapSwitch; egg path stays BRING BACK."
-    status: pending
+    status: completed
   - id: phase-5-farewell
     content: "Phase 5: FAREWELL_NEVER in declineFarewell, FAREWELL on the follower sheet, once-only tests."
     status: pending

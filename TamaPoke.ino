@@ -1311,6 +1311,8 @@ void renderMonSheet(const PartyMon &m, bool fromBox) {
   bool leftOk = fromBox ? (party.firstFree() >= 0)
                         : (pet.isEgg() && !pet.awaitingStarter());
   const char *leftLbl = fromBox ? T(S_BOX_TAKE) : T(S_REVIVE);
+  const char *leftWhy = fromBox ? T(S_PARTY_FULL) : T(S_REVIVE_EGG);
+  if (!fromBox && !pet.isEgg()) followSheetLeft(partyDetail - 1, &leftOk, &leftLbl, &leftWhy);  // FORK(follow)
   gfx->fillRoundRect(PDET_L_X, PDET_BTN_Y, PDET_L_W, PDET_BTN_H, 10,
                      leftOk ? UI_BAR_OK : UI_TRACK);
   gfx->drawRoundRect(PDET_L_X, PDET_BTN_Y, PDET_L_W, PDET_BTN_H, 10, UI_INK);
@@ -1338,11 +1340,10 @@ void renderMonSheet(const PartyMon &m, bool fromBox) {
   // Above the button there is clear space between it and the stat line, and
   // that is also where the eye is already travelling.
   if (!leftOk) {
-    const char *why = fromBox ? T(S_PARTY_FULL) : T(S_REVIVE_EGG);
     gfx->setTextColor(UI_BAR_WARN);
     gfx->setTextSize(1);
-    gfx->setCursor(CX - (int)strlen(why) * 3, PDET_BTN_Y - 14);
-    gfx->print(why);
+    gfx->setCursor(CX - (int)strlen(leftWhy) * 3, PDET_BTN_Y - 14);
+    gfx->print(leftWhy);
   }
   gfx->setTextColor(UI_TRACK);
   gfx->setTextSize(2);
@@ -1483,6 +1484,7 @@ void partyTap(int16_t x, int16_t y) {
     // or a miss on YES would fall through to the move rows underneath it.
     if (releaseConfirm) { monSheetConfirmTap(x, y, false); return; }
     if (monSheetBtn(x, y, true)) {           // BRING BACK
+      if (!pet.isEgg() && followTapSwitch(partyDetail - 1)) return;  // FORK(follow)
       if (!pet.isEgg() || pet.awaitingStarter()) { sfxPlay(SFX_DENY); return; }
       pet.reviveFrom(party.slots[partyDetail - 1]);
       party.releaseAt(partyDetail - 1);      // it is alive now, not banked
