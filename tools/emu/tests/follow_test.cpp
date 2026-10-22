@@ -574,6 +574,44 @@ int main() {
        "the same crash after a box copy does not put a second one in the party");
   }
 
+  // --- farewell is offered once. Restoring ageMinutes + 1440 makes the
+  // two-week check fail: the prompt comes back, and this asserts it does not.
+  {
+    boot(6);
+    pet.update(g_ms);
+    pet.screenIsOff = false;
+    pet.sleeping = false;
+    pet.frozen = false;
+    pet.ceremony = CER_NONE;
+    pet.ageMinutes = FAREWELL_AGE_MIN - 1;
+    pet.lastLearnLevel = 255;
+    pet.learnQCount = 0;
+    ck(!pet.canFarewellNow() && !pet.wantFarewellButton(),
+       "one minute short, the prompt stays down");
+    uint32_t before = pet.ageMinutes;
+    g_ms += PET_TICK_MS * 3;
+    pet.update(g_ms);
+    ck(pet.ageMinutes > before && pet.ageMinutes >= FAREWELL_AGE_MIN
+       && pet.wantFarewellButton(),
+       "the prompt fires once the requirements are reached");
+    pet.declineFarewell();
+    ck(pet.canFarewellNow() && !pet.wantFarewellButton(), "declining clears it");
+    party.replaceAt(0, mk(7, 10, 5));
+    ck(followSwitch(0) && pet.speciesId == 7, "the creature can be switched out");
+    ck(followSwitch(0) && pet.speciesId == 6 && !pet.wantFarewellButton(),
+       "and the decline is still there when it is switched back");
+    uint32_t goal = pet.ageMinutes + 14UL * 24 * 60;
+    uint32_t spins = 0, cap = 14UL * 24 * 60 * 2 + 8;
+    while (pet.ageMinutes < goal && spins < cap) {
+      g_ms += PET_TICK_MS;
+      pet.update(g_ms);
+      spins++;
+    }
+    ck(pet.ageMinutes >= goal, "two weeks of ticks did pass");
+    ck(pet.canFarewellNow() && !pet.wantFarewellButton() && pet.speciesId == 6,
+       "and the prompt never comes back");
+  }
+
   printf("%s\n", bad ? "FAILURES" : "all good");
   return bad ? 1 : 0;
 }

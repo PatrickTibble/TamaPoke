@@ -1231,6 +1231,7 @@ void onSwipeV(int dir) {
   if (movePickOpen) { movePickOpen = false; return; }
   if (boxOpen) { boxOpen = false; boxSel = 0; return; }   // vertical backs out
   if (partyOpen) {
+    if (followSheetBack()) return;  // FORK(follow)
     if (partyDetail) { partyDetail = 0; return; }
     if (partyPick) { partyPick = false; pet.endedKind = CER_NONE; }
     partyOpen = false;
@@ -1474,6 +1475,7 @@ bool monSheetConfirmTap(int16_t x, int16_t y, bool fromBox) {
 
 void partyTap(int16_t x, int16_t y) {
   if (boxOpen) { boxTap(x, y); return; }
+  if (followTapFarewell(x, y)) return;  // FORK(follow)
   // The SHEET IS CHECKED FIRST, and that is not cosmetic ordering. It covers the
   // whole screen, and its RELEASE button (x240..370, y336..384) lands inside the
   // BOX button's hit area (x138..328, y312..372) below -- so with BOX tested
@@ -1618,6 +1620,7 @@ void onSwipe(int dir) {
     return;
   }
   if (partyOpen) {
+    if (followSheetBack()) return;  // FORK(follow)
     if (partyDetail) { partyDetail = 0; return; }
     if (partyPick) { partyPick = false; pet.endedKind = CER_NONE; }
     partyOpen = false;
@@ -2226,7 +2229,8 @@ void render() {
     if (boxOpen) {
       if (boxDetail) renderBoxDetail();
       else renderBox();
-    } else if (partyDetail) renderPartyDetail();
+    } else if (followSheetUp()) followRenderSheet();  // FORK(follow)
+    else if (partyDetail) renderPartyDetail();
     else renderParty();
     return;
   }

@@ -17,6 +17,7 @@
 #define EVOLVE_ANIM_MS 5200UL              // animacion de evolucion (mas larga = mas epica)
 #define CEREMONY_MS 10000UL                // duracion de la despedida en pantalla
 #define FAREWELL_AGE_MIN (3UL * 24 * 60)   // se despide a los 3 dias de juego (en forma final)
+#define FAREWELL_NEVER UINT32_MAX          // FORK(follow): a decline is not offered again
 // Retiring a creature BEFORE it has earned its farewell costs the NEXT one a
 // day's worth of evolution. Derived from MINUTES_PER_LEVEL rather than written
 // as 24, so it stays "a day" if the level rate is ever retuned.
@@ -335,7 +336,7 @@ public:
   bool wantEvolveButton() const { return canEvolveNow() && level() > evoDeclinedLv; }
   bool wantFarewellButton() const { return canFarewellNow() && ageMinutes >= farDeclinedAge; }
   void declineEvolve() { evoDeclinedLv = level(); }              // re-ofrece al subir de nivel
-  void declineFarewell() { farDeclinedAge = ageMinutes + 1440; } // re-ofrece dentro de 1 dia
+  void declineFarewell() { farDeclinedAge = FAREWELL_NEVER; } // FORK(follow): once per creature
   // primera partida: el jugador elige inicial (Bulbasaur/Charmander/Squirtle)
   bool awaitingStarter() const { return starterPick; }
   void chooseStarter(int16_t dex) { eggTarget = dex; starterPick = false; save(); }

@@ -15,6 +15,7 @@ enum FollowStr : uint8_t {
   F_LEARN_FIRST,
   F_NOT_NOW,
   F_FOLLOWING,
+  F_FAREWELL,
   F_COUNT
 };
 
@@ -58,6 +59,14 @@ void followLoad();    // reads f_ext; finishes or deletes f_swap; then moves a l
 uint8_t followShownCount();
 void followDrawCell();                 // cell 5, unless a legacy member still occupies it
 bool followCellTap(int16_t x, int16_t y); // swallows that cell unless the member is still there
+// Cell 6 of an empty slot 5, hatched follower only. Built from followSnapshot.
+// An egg is swallowed by followCellTap and never opens this.
+bool followSheetUp();
+void followRenderSheet();             // flushes; FAREWELL only while canFarewellNow
+void followDrawFarewell();
+// Consumes the tap while the sheet is up. The button calls startFarewell().
+bool followTapFarewell(int16_t x, int16_t y);
+bool followSheetBack();               // a swipe closes the sheet, not the party under it
 // Party sheet, hatched follower only. Writes the left button from followCanSwitch
 // and FT. An egg returns false and leaves the caller's BRING BACK values alone.
 bool followSheetLeft(uint8_t slot, bool *ok, const char **label, const char **why);

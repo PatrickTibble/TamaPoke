@@ -16,7 +16,7 @@ todos:
     status: completed
   - id: phase-5-farewell
     content: "Phase 5: FAREWELL_NEVER in declineFarewell, FAREWELL on the follower sheet, once-only tests."
-    status: pending
+    status: completed
   - id: phase-6-docs
     content: "Phase 6: append the follow section and hook table to FORK.md."
     status: pending

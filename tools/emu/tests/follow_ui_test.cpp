@@ -22,6 +22,7 @@ void FakeESP::restart() { exit(0); }
 int FakeSerial::available() { return 0; }
 String FakeSerial::readStringUntil(char) { return String(""); }
 void setup();
+void loop();
 void render();
 void partyTap(int16_t, int16_t);
 uint8_t uiCurrentScreen();
@@ -74,6 +75,9 @@ static PartyMon mon(int dex, int lvl, const char *nick) {
 #define CELL_W 150
 #define CELL_H 70
 static void tapCell(int i) { partyTap(CELL_X(i) + CELL_W / 2, CELL_Y(i) + CELL_H / 2); }
+static void leaveFollowerSheet() {
+  if (followSheetUp()) partyTap(20, 20);
+}
 
 static uint16_t pix(int x, int y) { return gfx->buffer()[y * gfx->_w + x]; }
 static bool glyphAt(int x, int y, char ch, int size, uint16_t col) {
@@ -174,7 +178,10 @@ int main() {
   // cell 6 cannot be filled. The same three actions still work on cell 1.
   emptyParty();
   tapCell(5);
-  ck(party.slots[5].empty() && boxSwapFrom == 0, "tapping cell 6 does not arm a swap");
+  ck(party.slots[5].empty() && boxSwapFrom == 0 && followSheetUp(),
+     "tapping cell 6 opens the follower sheet and does not arm a swap");
+  leaveFollowerSheet();
+  ck(!followSheetUp(), "leaving that sheet does not arm a swap either");
   tapCell(0);
   ck(party.slots[0].empty() && boxSwapFrom == 1, "tapping cell 1 does");
 
@@ -184,8 +191,10 @@ int main() {
   boxSel = 1;
   partyOpen = true;
   tapCell(5);
-  ck(party.slots[5].empty() && party.box[0].dex == 25,
+  ck(party.slots[5].empty() && party.box[0].dex == 25 && followSheetUp() && boxSel == 1,
      "a box creature dropped on cell 6 stays in the box");
+  leaveFollowerSheet();
+  ck(!followSheetUp() && boxSel == 1, "leaving the sheet keeps the box creature selected");
   tapCell(0);
   ck(party.slots[0].dex == 25 && party.box[0].empty() && party.slots[5].empty(),
      "the same drop on cell 1 deposits it");
@@ -195,7 +204,10 @@ int main() {
   partyPick = true;
   partyOpen = true;
   tapCell(5);
-  ck(party.slots[5].empty() && partyPick, "the replace picker cannot fill cell 6");
+  ck(party.slots[5].empty() && partyPick && followSheetUp(),
+     "the replace picker cannot fill cell 6");
+  leaveFollowerSheet();
+  ck(!followSheetUp() && partyPick, "leaving the sheet keeps the newcomer waiting");
   tapCell(0);
   ck(party.slots[0].dex == 143 && !partyPick && party.slots[5].empty(),
      "and cell 1 still takes the newcomer");
@@ -217,6 +229,8 @@ int main() {
        "with the reason above it");
     ck(!see("BRING BACK", 2, 0x8410, 70, 336, 250, 384),
        "and not BRING BACK");
+    ck(!see("FAREWELL", 2, UI_INK, 0, 300, gfx->_w, 420),
+       "a banked sheet has no FAREWELL button");
   }
   int16_t live = pet.speciesId;
   partyTap(233, 360);
@@ -241,7 +255,16 @@ int main() {
   on("main");
 
   if (!pet.isEgg()) pet.newEgg();
+  clearScreens();
   partyOpen = true;
+  tapCell(5);
+  ck(!followSheetUp() && partyDetail == 0 && party.slots[5].empty(),
+     "an egg cell is swallowed and opens no sheet");
+  gfx->frameReady = false;
+  render();
+  if (on("party"))
+    ck(!see("FAREWELL", 2, UI_INK, 0, 0, gfx->_w, gfx->_h),
+       "and the grid does not offer FAREWELL");
   partyDetail = 1;
   gfx->frameReady = false;
   render();
@@ -272,7 +295,66 @@ int main() {
     ck(!see("SWITCH", 2, UI_BG_DAY, 70, 336, 250, 384) &&
        !see("SWITCH", 2, 0x8410, 70, 336, 250, 384),
        "and not SWITCH");
+    ck(!see("FAREWELL", 2, UI_INK, 0, 300, gfx->_w, 420),
+       "a boxed creature has no FAREWELL button");
   }
+
+  // The follower's own sheet. Hidden until the farewell is earned, then the
+  // button runs the same ceremony the prompt does.
+  emptyParty();
+  pet.dbgHatchAs(6, false);
+  snprintf(pet.nick, sizeof(pet.nick), "ZARD");
+  pet.moves[0] = 9;
+  while (pet.hasLearnOffer()) pet.declineLearn();
+  pet.sleeping = false;
+  pet.frozen = false;
+  pet.ceremony = CER_NONE;
+  pet.ageMinutes = FAREWELL_AGE_MIN - 1;
+  clearScreens();
+  partyOpen = true;
+  tapCell(5);
+  ck(followSheetUp() && party.slots[5].empty(), "cell 6 opens the follower, not a party slot");
+  gfx->frameReady = false;
+  render();
+  if (on("party")) {
+    ck(gfx->frameReady, "the follower sheet flushes");
+    ck(see("ZARD", 2, DEX_TBL[6].accent, 0, 20, gfx->_w, 80),
+       "the sheet is built from the follower");
+    ck(!see("FAREWELL", 2, UI_INK, 0, 280, gfx->_w, 420),
+       "FAREWELL is hidden one minute short of the requirements");
+    ck(pix(90, 344) != UI_BAR_WARN, "and the button is not drawn");
+  }
+  partyTap(233, 360);
+  ck(pet.ceremony == CER_NONE && !followSheetUp(),
+     "that tap does not start a farewell");
+
+  pet.ageMinutes = FAREWELL_AGE_MIN;
+  partyOpen = true;
+  tapCell(5);
+  gfx->frameReady = false;
+  render();
+  if (on("party")) {
+    ck(see("FAREWELL", 2, UI_INK, 70, 320, 280, 400),
+       "FAREWELL is shown once the requirements are met");
+    ck(pix(90, 344) == UI_BAR_WARN, "on the gold button");
+  }
+  uint8_t lv = pet.level();
+  partyTap(233, 360);
+  ck(pet.ceremony == CER_FAREWELL && !partyOpen && !followSheetUp(),
+     "the tap starts the farewell and leaves the sheet");
+  on("main");
+  ck(party.count() == 0 && pet.speciesId == 6, "it is not banked until the ceremony ends");
+  emuSetTimeScale(100000);
+  uint32_t t0 = millis();
+  while ((uint32_t)(millis() - t0) < CEREMONY_MS + 2000) {}
+  emuSetTimeScale(1);
+  loop();
+  ck(pet.isEgg() && pet.ceremony == CER_NONE && pet.lastEnd == CER_FAREWELL,
+     "the ceremony ends into a blessed egg");
+  ck(party.count() == 1 && party.slots[0].dex == 6 && party.slots[0].level == lv
+     && party.slots[0].moves[0] == 9 && !strcmp(party.slots[0].nick, "ZARD")
+     && party.slots[5].empty(),
+     "and banks the creature the same way the prompt does");
 
   printf("%s\n", bad ? "FAILURES" : "all good");
   return bad ? 1 : 0;
