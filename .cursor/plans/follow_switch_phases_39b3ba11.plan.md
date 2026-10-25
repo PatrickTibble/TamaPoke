@@ -19,7 +19,7 @@ todos:
     status: completed
   - id: phase-6-docs
     content: "Phase 6: append the follow section and hook table to FORK.md."
-    status: pending
+    status: completed
 isProject: false
 ---
 
