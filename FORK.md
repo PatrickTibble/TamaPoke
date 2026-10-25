@@ -1,8 +1,9 @@
 # FORK.md -- what this fork adds, and how to keep it mergeable
 
 This is a fork of [DylanPDao/TamaPoke](https://github.com/DylanPDao/TamaPoke)
-(`upstream`). It adds one feature, **wild battles driven by per-region encounter
-areas**, and is built so that pulling upstream stays a routine merge.
+(`upstream`). It adds **wild battles driven by per-region encounter areas**
+and **party-follower switching**, and is built so that pulling upstream stays a
+routine merge.
 `README.md` and `CLAUDE.md` describe upstream and are deliberately not edited;
 this file is where the fork documents itself.
 
@@ -69,6 +70,7 @@ git fetch upstream
 git checkout main && git merge --ff-only upstream/main
 git checkout pt/feat/wild-encounters && git merge main
 rg "FORK\(wild\)"                    # every hook still where it should be
+rg "FORK\(follow\)"
 bash tools/emu/tests/run.sh          # all suites, plus gen_wild.py --check/--selftest
 ```
 
@@ -367,3 +369,204 @@ Each fight costs 8 energy and is refused below 25, so a rested pet gets about te
   the `w_seen` round-trip only.
 - The seen bitmap shows only as the wild region chooser's subtitle; the Pokedex
   detail does not use `wildSeen()`.
+
+## Party follower switching
+
+Any banked party member can become the live follower, the one that ages and
+takes care. The outgoing follower takes that member's slot, with its care
+state kept. Level is still age: only the follower ages, and a switch moves no
+levels. Battles still pay out training and badges only.
+
+New files, same split as wild: `follow.h` / `follow.cpp` have no sketch
+dependency and link into the headless tests. Drawing and taps need the sketch
+globals, so they live in `follow_ui.h`, included once at the bottom of
+`TamaPoke.ino`. Strings are `FT()` in `follow.cpp` (`F_STRINGS`), never a row
+in `i18n.cpp`. Tests: `tools/emu/tests/follow_test.cpp`,
+`tools/emu/tests/follow_ui_test.cpp`.
+
+### Switching
+
+`followCanSwitch(slot, &reason)` is the only answer the sheet, the tap and
+`FOLLOW` share.
+
+| state | result |
+|---|---|
+| egg, ceremony, evolution animation, starter still unpicked, empty slot | refused, `NOT NOW` |
+| a move-learn offer is pending (`learnQueue` is RAM only and would be lost) | refused, `LEARN THE MOVE FIRST` |
+| asleep | allowed; the incoming creature arrives awake |
+
+While an egg is waiting, the party sheet's left button stays upstream's
+BRING BACK, so `release_test` is unchanged. Once the follower is hatched, that
+button is SWITCH. Success closes the sheet and the party (`partyOpen` clear,
+so the screen is `SCR_MAIN`) and plays `SFX_HATCH`. A refusal plays
+`SFX_DENY` and leaves the sheet up.
+
+The swap is one-for-one, so it cannot break the cap. Order, so a crash has
+only two outcomes:
+
+1. Write `f_swap`: the slot index plus the outgoing `PartyMon`.
+2. `pet.saveNow()` of the incoming creature.
+3. `party.replaceAt` with the outgoing creature.
+4. `followSave()` of `f_ext`.
+5. Delete `f_swap`.
+
+Age, bond, care, mistakes, moves, nick and IVs come from the `FollowExt`
+record plus the `PartyMon`. `FollowIO` is a friend of `Pet` so those private
+care fields move without a second copy of them. A missing record uses the same
+fallback as `Pet::reviveFrom()`: age `(level - 1) * MINUTES_PER_LEVEL`,
+`lastLearnLevel = level`, fresh care (fullness, joy and energy 80, hygiene
+100). `frozen` is still cleared.
+
+At boot, a leftover journal is finished or deleted and nothing else:
+
+- The live pet's fingerprint matches the creature still in that slot, and
+  differs from the outgoing record: `saveNow` already ran, so finish
+  `replaceAt`.
+- Any other case, including a short or odd-sized blob: the swap never took
+  effect, so delete the journal.
+
+Records match by content, not by slot. The fingerprint is FNV-1a over dex,
+level, medals, IVs, training, shiny and nick. Moves are left out, so editing a
+banked moveset still finds the record. An empty mon hashes to 0; a real hash
+of 0 is stored as 1. A deposit, a withdraw and a reorder need no hook.
+
+### Cap, and the cell that is not a slot
+
+Storage stays `PARTY_SLOTS` 6. Shrinking it would make `Party::begin()` read a
+180-byte blob as shorter records. `PARTY_CAP` is `PARTY_SLOTS - 1`. Both
+`firstFree()` and `isFull()` look only at slots `[0, PARTY_CAP)`. `isFull()`
+is `firstFree() < 0`, not `count() >= PARTY_CAP`: a leftover occupant of slot
+5 would make those two disagree. `count()` still counts all six, which is why
+a test that wrote six members and never called `followLoad()` still sees six.
+
+Slot index 5 is the follower's cell on the grid. `followDrawCell()` paints it,
+tagged FOLLOWING, after the slot loop, and only while the slot is empty.
+`followCellTap()` runs before that loop and swallows the cell, so a box drop
+(`boxSel`), the replace picker (`partyPick`) and arming a swap (`boxSwapFrom`)
+cannot fill it. `pickCandidates()` still loops all six slots; in normal play
+slot 5 is empty.
+
+A save from before the cap can still hold a sixth member in slot 5.
+`followLoad()` moves it once, after the journal check: copy to the first hole
+in 0-4, else into the box, and clear slot 5 only after that copy is saved. A
+fingerprint already in either place means the crash landed between the two
+writes, so the leftover is cleared and not copied again. If slots 0-4 and the
+box are both full, it stays. While it stays, `followDrawCell` and
+`followCellTap` return without drawing or swallowing, and the normal slot loop
+keeps the creature visible and depositable. Nothing is hidden or deleted.
+
+### `followShownCount()`
+
+The header is not `party.count()`. `followShownCount()` is the one answer,
+used at both `S_PARTY_FMT` sites (the party header and the player card):
+
+- Slot 5 empty: `party.count() + 1`. The live follower counts, and so does an
+  egg, the same way the main games count an egg in the party.
+- Slot 5 still occupied: `party.count()`, so six banked members do not read
+  as `7/6`.
+
+The serial `PARTY` line stays a storage dump and does not call it.
+
+### `followLoad()` is not inside `begin()`
+
+`party.begin()` and `pet.begin()` load NVS. `followLoad()` runs once after
+both, from `setup()`. It is not called from `Party::begin()`.
+`box_test`, `save_test`, `moves_test` and `touch_test` seed six members by
+writing `slots[]` and never call `followLoad()`, so the slot-5 move stays a
+boot step and those suites stay green. A boot with no journal and an empty
+slot 5 writes nothing.
+
+### `f_ext` and `f_swap`
+
+| key | in `SAVE_FIELDS` | what it is |
+|---|---|---|
+| `f_ext` | yes, `{ "f_ext", SK_BYTES }` | up to 8 `FollowExt` records, 28 bytes each, 224 bytes, under `MAX_VAL` (768) |
+| `f_swap` | no | the swap journal: one slot byte plus the outgoing `PartyMon` |
+
+`f_ext` is additive. Absent reads as no records. A short blob fills the front,
+whole records only. A longer blob is truncated to 8. Upstream never reads the
+key; its `IMPORT` skips unknown keys, so a fork backup restores there minus
+the care records, and an upstream backup restores here with no records. The
+party and box strides are unchanged.
+
+`f_swap` is left out of `SAVE_FIELDS` on purpose. A backup must not contain
+it. The journal is crash recovery for the device that is mid-swap, not player
+state. `EXPORT` walks `SAVE_FIELDS` only, so a backup taken in that window
+does not carry the journal, and `IMPORT` cannot replay it: the next
+`followLoad()` would otherwise finish `replaceAt` or delete the key against
+whatever the restored pet and slot happen to fingerprint as. Crash recovery
+stays in NVS, on the device that crashed, and is gone once the swap completes.
+
+### Eviction
+
+`followSave()` drops any record whose fingerprint matches no party or box
+member. `followStore()` refreshes a match by moving it to the end. When all 8
+slots are full it prunes first, then drops the oldest (index 0). The newcomer
+is kept even if it is not in the party yet: the switch banks it on the next
+line, and the prune runs only after that. A creature whose record was evicted
+comes back through the `reviveFrom` fallback above.
+
+### A legacy frozen companion ages again
+
+`Pet::reviveFrom()` sets `frozen`, which is how a brought-back companion stops
+ageing. `followSwitch` always clears `frozen`, sets `sleeping = false` and
+clears `learnQCount`. A frozen follower that is switched out and back in
+starts ageing. That is the point of the switch: the incoming creature grows.
+
+### Farewell, once
+
+No new field. `declineFarewell()` sets `farDeclinedAge = FAREWELL_NEVER`
+(`UINT32_MAX`) instead of `ageMinutes + 1440`. `wantFarewellButton()` is
+`canFarewellNow() && ageMinutes >= farDeclinedAge`, so that creature is never
+auto-prompted again. The sentinel already rides in `FollowExt`, so a switch
+keeps it. Upstream reads it as "not yet" and simply never re-offers. A
+creature with no record falls back to 0 and may be prompted once more.
+
+The manual button is only for the live follower. Tapping cell 6 while slot 5
+is empty opens a sheet built from `followSnapshot(pet)`, not from a party
+slot. `followDrawFarewell()` shows `FT(F_FAREWELL)` ("TO PARTY") only while
+`canFarewellNow()` is true (final form, not frozen, not asleep, age at least
+`FAREWELL_AGE_MIN`), and the tap calls the existing `startFarewell()`. Banked
+party and box sheets do not get it. An egg cell is swallowed and opens no
+sheet. A swipe calls `followSheetBack()` and closes that sheet, not the party
+under it.
+
+The confirm no longer says goodbye. `followBankCopy()` is the question, the
+two buttons and the line under them: "Join the party?", "To the party",
+"Keep following", "Switch them back any time". The gold button and the
+ceremony line (`followFarewellBtnFmt()`, `followFarewellMsg()`) say the same
+thing. An early retire still uses upstream's "Goodbye" and its cost lines,
+because that creature is not banked. A free retire, which is a farewell
+reached from the menu, uses the party copy.
+
+### Hooks
+
+`rg "FORK\(follow\)"` after every upstream merge:
+
+| file | hook |
+|---|---|
+| `TamaPoke.ino` | `#include "follow.h"` at the top, `#include "follow_ui.h"` at the very bottom (after `wild_ui.h`) |
+| `TamaPoke.ino` | `setup()`: `followLoad();` immediately after `party.begin(); pet.begin();` |
+| `TamaPoke.ino` | serial dispatch: `if (followSerial(line)) return;` |
+| `TamaPoke.ino` | both party swipes: `if (followSheetBack()) return;` before the sheet or the party closes |
+| `TamaPoke.ino` | `renderMonSheet()`: `followSheetLeft()` when `!fromBox && !pet.isEgg()` |
+| `TamaPoke.ino` | `partyTap()`: `followTapFarewell()` first; `followTapSwitch()` before the BRING BACK branch; `followCellTap()` before the slot loop |
+| `TamaPoke.ino` | render: `followSheetUp()` draws `followRenderSheet()` instead of the party |
+| `TamaPoke.ino` | both `S_PARTY_FMT` sites pass `followShownCount()` |
+| `TamaPoke.ino` | `renderParty()`: `followDrawCell();` after the slot loop |
+| `TamaPoke.ino` | farewell dialog and a free retire: `followBankCopy()`; gold button: `followFarewellBtnFmt()`; banking ceremony: `followFarewellMsg()` |
+| `pet.h` | `FAREWELL_NEVER`; `declineFarewell()` assigns it; `friend struct FollowIO` |
+| `party.h` | `PARTY_CAP`; `isFull()` is `firstFree() < 0` |
+| `party.cpp` | `firstFree()` loops to `PARTY_CAP` |
+| `save.cpp` | `{ "f_ext", SK_BYTES }` in `SAVE_FIELDS` |
+| `tools/emu/tests/run.sh` | `follow_ui_test` joins `needs_sketch` (wrapped, not edited) |
+
+`tools/emu/sketch.cpp` is generated from the sketch, so it repeats the `TamaPoke.ino` tags. `follow_ui_test.cpp` names the tag in a comment. Neither is a hook.
+
+Untagged, because the line is a list entry rather than a hook:
+
+- `tools/emu/build.sh` and `tools/emu/tests/run.sh` (`CORE`): `follow.cpp` added to the source lists.
+
+```bash
+bash tools/emu/tests/run.sh follow   # follow_test and follow_ui_test
+```

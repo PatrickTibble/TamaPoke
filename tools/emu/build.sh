@@ -29,7 +29,7 @@ g++ -std=c++17 -O1 -w -pthread \
   -DSPRITE_DIR="\"$ROOT/tools/sdcard/mons\"" \
   $(sdl2-config --cflags) \
   -o tamapoke-emu \
-  sketch.cpp wavout.cpp "$ROOT/gbsynth.cpp" "$ROOT/pet.cpp" "$ROOT/i18n.cpp" "$ROOT/party.cpp" "$ROOT/battle.cpp" "$ROOT/link.cpp" "$ROOT/save.cpp" "$ROOT/wild.cpp" "$ROOT/audio.cpp" \
+  sketch.cpp wavout.cpp "$ROOT/gbsynth.cpp" "$ROOT/pet.cpp" "$ROOT/i18n.cpp" "$ROOT/party.cpp" "$ROOT/battle.cpp" "$ROOT/link.cpp" "$ROOT/save.cpp" "$ROOT/wild.cpp" "$ROOT/follow.cpp" "$ROOT/audio.cpp" \
   host_impl.cpp i2s_sdl.cpp font.cpp clock.cpp main_sdl.cpp \
   $(sdl2-config --libs)
 
