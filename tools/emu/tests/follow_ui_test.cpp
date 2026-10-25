@@ -32,6 +32,8 @@ extern Pet pet;
 extern bool cardOpen, galleryOpen, clockOpen, kbOpen, menuOpen, partyOpen, partyPick;
 extern bool trainOpen, movePickOpen, battleOpen, gymOpen, playerOpen;
 extern bool boxOpen, releaseConfirm;
+extern uint8_t choiceKind;
+extern uint32_t choiceUntil, partyBannerUntil;
 extern uint8_t partyDetail, boxDetail, boxSwapFrom, boxSel, playerPage;
 extern const uint8_t GLCD_FONT[];
 
@@ -229,8 +231,8 @@ int main() {
        "with the reason above it");
     ck(!see("BRING BACK", 2, 0x8410, 70, 336, 250, 384),
        "and not BRING BACK");
-    ck(!see("FAREWELL", 2, UI_INK, 0, 300, gfx->_w, 420),
-       "a banked sheet has no FAREWELL button");
+    ck(!see("TO PARTY", 2, UI_INK, 0, 300, gfx->_w, 420),
+       "a banked sheet has no TO PARTY button");
   }
   int16_t live = pet.speciesId;
   partyTap(233, 360);
@@ -263,8 +265,8 @@ int main() {
   gfx->frameReady = false;
   render();
   if (on("party"))
-    ck(!see("FAREWELL", 2, UI_INK, 0, 0, gfx->_w, gfx->_h),
-       "and the grid does not offer FAREWELL");
+    ck(!see("TO PARTY", 2, UI_INK, 0, 0, gfx->_w, gfx->_h),
+       "and the grid does not offer TO PARTY");
   partyDetail = 1;
   gfx->frameReady = false;
   render();
@@ -295,8 +297,8 @@ int main() {
     ck(!see("SWITCH", 2, UI_BG_DAY, 70, 336, 250, 384) &&
        !see("SWITCH", 2, 0x8410, 70, 336, 250, 384),
        "and not SWITCH");
-    ck(!see("FAREWELL", 2, UI_INK, 0, 300, gfx->_w, 420),
-       "a boxed creature has no FAREWELL button");
+    ck(!see("TO PARTY", 2, UI_INK, 0, 300, gfx->_w, 420),
+       "a boxed creature has no TO PARTY button");
   }
 
   // The follower's own sheet. Hidden until the farewell is earned, then the
@@ -320,8 +322,8 @@ int main() {
     ck(gfx->frameReady, "the follower sheet flushes");
     ck(see("ZARD", 2, DEX_TBL[6].accent, 0, 20, gfx->_w, 80),
        "the sheet is built from the follower");
-    ck(!see("FAREWELL", 2, UI_INK, 0, 280, gfx->_w, 420),
-       "FAREWELL is hidden one minute short of the requirements");
+    ck(!see("TO PARTY", 2, UI_INK, 0, 280, gfx->_w, 420),
+       "TO PARTY is hidden one minute short of the requirements");
     ck(pix(90, 344) != UI_BAR_WARN, "and the button is not drawn");
   }
   partyTap(233, 360);
@@ -334,8 +336,8 @@ int main() {
   gfx->frameReady = false;
   render();
   if (on("party")) {
-    ck(see("FAREWELL", 2, UI_INK, 70, 320, 280, 400),
-       "FAREWELL is shown once the requirements are met");
+    ck(see("TO PARTY", 2, UI_INK, 70, 320, 280, 400),
+       "TO PARTY is shown once the requirements are met");
     ck(pix(90, 344) == UI_BAR_WARN, "on the gold button");
   }
   uint8_t lv = pet.level();
@@ -355,6 +357,61 @@ int main() {
      && party.slots[0].moves[0] == 9 && !strcmp(party.slots[0].nick, "ZARD")
      && party.slots[5].empty(),
      "and banks the creature the same way the prompt does");
+
+  // An early retire is a real goodbye. An earned farewell banks them.
+  clearScreens();
+  partyBannerUntil = 0;
+  choiceKind = 3;
+  choiceUntil = millis() + 60000;
+  gfx->frameReady = false;
+  render();
+  if (on("main")) {
+    ck(see("Goodbye", 2, UI_INK, 0, 200, gfx->_w, gfx->_h),
+       "an early retire still says Goodbye");
+    ck(see("it will not join your party", 1, UI_BAR_BAD, 0, 180, gfx->_w, 230),
+       "and still says they will not join the party");
+    ck(!see("Join the party?", 2, UI_INK, 0, 0, gfx->_w, gfx->_h),
+       "it does not offer the party");
+  }
+  pet.dbgHatchAs(6, false);
+  pet.ageMinutes = FAREWELL_AGE_MIN;
+  pet.sleeping = false;
+  pet.ceremony = CER_NONE;
+  pet.learnQCount = 0;
+  clearScreens();
+  choiceKind = 2;
+  choiceUntil = millis() + 60000;
+  gfx->frameReady = false;
+  render();
+  if (on("main")) {
+    ck(see("Join the party?", 2, UI_INK, 0, 140, gfx->_w, 220),
+       "the farewell question is about the party");
+    ck(see("To the party", 2, UI_INK, 80, 220, 390, 360),
+       "the confirm sends them to the party");
+    ck(see("Keep following", 2, UI_WHITE, 80, 280, 390, 430),
+       "and staying keeps them following");
+    ck(see("Switch them back any time", 1, UI_INK, 0, 170, gfx->_w, 230),
+       "the line under it says they can come back");
+    ck(!see("Goodbye", 2, UI_INK, 0, 0, gfx->_w, gfx->_h),
+       "Goodbye is gone from this dialog");
+    ck(!see("Say goodbye?", 2, UI_INK, 0, 0, gfx->_w, gfx->_h),
+       "and so is Say goodbye?");
+  }
+  choiceKind = 3;
+  gfx->frameReady = false;
+  render();
+  if (on("main")) {
+    ck(see("Join the party?", 2, UI_INK, 0, 140, gfx->_w, 220),
+       "a free retire uses the same party question");
+    ck(!see("it will not join your party", 1, UI_BAR_BAD, 0, 0, gfx->_w, gfx->_h),
+       "and does not claim they are gone");
+  }
+  choiceKind = 0;
+  gfx->frameReady = false;
+  render();
+  if (on("main"))
+    ck(see("can join the party", 2, UI_INK, 0, 160, gfx->_w, 280),
+       "the gold button says they can join the party");
 
   printf("%s\n", bad ? "FAILURES" : "all good");
   return bad ? 1 : 0;

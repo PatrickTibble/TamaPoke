@@ -15,7 +15,13 @@ enum FollowStr : uint8_t {
   F_LEARN_FIRST,
   F_NOT_NOW,
   F_FOLLOWING,
-  F_FAREWELL,
+  F_FAREWELL,       // follower sheet: banks them. "TO PARTY", not a goodbye
+  F_FAR_Q,          // earned farewell / free retire: they join the party
+  F_FAR_YES,
+  F_FAR_NO,
+  F_FAR_SUB,
+  F_FAR_BTN,        // gold button, "%s ..."
+  F_FAR_MSG,        // ceremony line, only when they are actually banked
   F_COUNT
 };
 
@@ -62,7 +68,7 @@ bool followCellTap(int16_t x, int16_t y); // swallows that cell unless the membe
 // Cell 6 of an empty slot 5, hatched follower only. Built from followSnapshot.
 // An egg is swallowed by followCellTap and never opens this.
 bool followSheetUp();
-void followRenderSheet();             // flushes; FAREWELL only while canFarewellNow
+void followRenderSheet();             // flushes; TO PARTY only while canFarewellNow
 void followDrawFarewell();
 // Consumes the tap while the sheet is up. The button calls startFarewell().
 bool followTapFarewell(int16_t x, int16_t y);
@@ -83,3 +89,8 @@ bool followCanSwitch(uint8_t slot, FollowStr *reason);
 bool followSwitch(uint8_t slot);
 bool followSerial(const String &line);   // FOLLOW lists records; FOLLOW <1-6> switches
 const char *FT(FollowStr id);
+// Copy for a farewell that banks the creature. Early retire keeps upstream's
+// "Goodbye": that creature is not banked.
+void followBankCopy(const char **q, const char **yes, const char **no, const char **sub);
+const char *followFarewellBtnFmt();
+const char *followFarewellMsg();

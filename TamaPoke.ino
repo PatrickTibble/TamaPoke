@@ -2299,6 +2299,8 @@ void render() {
     const char *msg = (pet.ceremony == CER_FAREWELL) ? T(S_FAREWELL)
                       : (pet.ceremony == CER_RUNAWAY) ? T(S_RUNAWAY)
                                                       : T(S_GOODBYE);
+    if (pet.ceremony == CER_FAREWELL && !pet.retireIsEarly())
+      msg = followFarewellMsg();  // FORK(follow): banked, not gone
     drawHeader(d.name, d.accent, msg);
     drawCeremony();
     gfx->flush();
@@ -5858,7 +5860,7 @@ void drawConfirmPanel(const char *q, const char *sub1, const char *sub2,
 void drawChoiceDialog() {
   const char *q, *o1, *o2;
   const char *sub1 = nullptr, *sub2 = nullptr;
-  uint16_t c1, c2, t1, t2;
+  uint16_t c1, c2, t1, t2, subCol = UI_BAR_BAD;
   if (choiceKind == 1) {  // evolucion
     q = T(S_EVO_Q); o1 = T(S_EVO_TAP); o2 = T(S_EVO_KEEP);
     c1 = UI_BAR_BAD; t1 = UI_WHITE; c2 = UI_TRACK; t2 = UI_INK;
@@ -5871,11 +5873,14 @@ void drawChoiceDialog() {
     // banked at all, which is the half a player would not otherwise discover
     // until the party screen came up empty.
     if (!pet.retireIsFree()) { sub1 = T(S_RETIRE_COST); sub2 = T(S_RETIRE_GONE); }
-  } else {                // despedida
+    else { followBankCopy(&q, &o1, &o2, &sub1); subCol = UI_INK; }  // FORK(follow)
+  } else {                // despedida: they join the party
     q = T(S_FAR_Q); o1 = T(S_FAR_GO); o2 = T(S_FAR_STAY);
+    followBankCopy(&q, &o1, &o2, &sub1);  // FORK(follow)
+    subCol = UI_INK;
     c1 = UI_BAR_WARN; t1 = UI_INK; c2 = UI_BAR_OK; t2 = UI_WHITE;
   }
-  drawConfirmPanel(q, sub1, sub2, UI_BAR_BAD, o1, c1, t1, o2, c2, t2);
+  drawConfirmPanel(q, sub1, sub2, subCol, o1, c1, t1, o2, c2, t2);
 }
 
 // boton-CTA rojo y grande para evolucionar (pulsa para llamar la atencion)
@@ -5902,7 +5907,7 @@ void drawFarewellButton() {
   gfx->drawRoundRect(x, y, w, h, 16, UI_INK);
   char buf[52];
   const char *nm = pet.nick[0] ? pet.nick : DEX_TBL[pet.speciesId].name;
-  snprintf(buf, sizeof(buf), T(S_FAREWELL_BTN), nm);
+  snprintf(buf, sizeof(buf), followFarewellBtnFmt(), nm);  // FORK(follow)
   gfx->setTextColor(UI_INK);
   gfx->setTextSize(2);
   gfx->setCursor(CX - (int)strlen(buf) * 6, y + h / 2 - 8);

@@ -524,12 +524,20 @@ creature with no record falls back to 0 and may be prompted once more.
 
 The manual button is only for the live follower. Tapping cell 6 while slot 5
 is empty opens a sheet built from `followSnapshot(pet)`, not from a party
-slot. `followDrawFarewell()` shows `FT(F_FAREWELL)` only while
+slot. `followDrawFarewell()` shows `FT(F_FAREWELL)` ("TO PARTY") only while
 `canFarewellNow()` is true (final form, not frozen, not asleep, age at least
 `FAREWELL_AGE_MIN`), and the tap calls the existing `startFarewell()`. Banked
 party and box sheets do not get it. An egg cell is swallowed and opens no
 sheet. A swipe calls `followSheetBack()` and closes that sheet, not the party
 under it.
+
+The confirm no longer says goodbye. `followBankCopy()` is the question, the
+two buttons and the line under them: "Join the party?", "To the party",
+"Keep following", "Switch them back any time". The gold button and the
+ceremony line (`followFarewellBtnFmt()`, `followFarewellMsg()`) say the same
+thing. An early retire still uses upstream's "Goodbye" and its cost lines,
+because that creature is not banked. A free retire, which is a farewell
+reached from the menu, uses the party copy.
 
 ### Hooks
 
@@ -546,6 +554,7 @@ under it.
 | `TamaPoke.ino` | render: `followSheetUp()` draws `followRenderSheet()` instead of the party |
 | `TamaPoke.ino` | both `S_PARTY_FMT` sites pass `followShownCount()` |
 | `TamaPoke.ino` | `renderParty()`: `followDrawCell();` after the slot loop |
+| `TamaPoke.ino` | farewell dialog and a free retire: `followBankCopy()`; gold button: `followFarewellBtnFmt()`; banking ceremony: `followFarewellMsg()` |
 | `pet.h` | `FAREWELL_NEVER`; `declineFarewell()` assigns it; `friend struct FollowIO` |
 | `party.h` | `PARTY_CAP`; `isFull()` is `firstFree() < 0` |
 | `party.cpp` | `firstFree()` loops to `PARTY_CAP` |

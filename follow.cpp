@@ -302,12 +302,24 @@ bool followSwitch(uint8_t slot) {
 
 // Rows follow the Lang enum: ES, EN, FR, DE, IT, PT. ASCII only.
 static const char *const F_STRINGS[LANG_COUNT][F_COUNT] = {
-  { "CAMBIAR", "APRENDE EL MOVIMIENTO PRIMERO", "AHORA NO", "SIGUIENDO", "DESPEDIDA" },
-  { "SWITCH", "LEARN THE MOVE FIRST", "NOT NOW", "FOLLOWING", "FAREWELL" },
-  { "CHANGER", "APPRENDS LE MOUVEMENT", "PAS MAINTENANT", "SUIT", "ADIEU" },
-  { "WECHSELN", "LERNE ZUERST DIE ATTACKE", "NICHT JETZT", "FOLGT", "ABSCHIED" },
-  { "CAMBIA", "IMPARA PRIMA LA MOSSA", "NON ORA", "SEGUE", "ADDIO" },
-  { "TROCAR", "APRENDE O GOLPE ANTES", "AGORA NAO", "SEGUE", "ADEUS" },
+  { "CAMBIAR", "APRENDE EL MOVIMIENTO PRIMERO", "AHORA NO", "SIGUIENDO", "AL EQUIPO",
+    "Pasa al equipo?", "Al equipo", "Que siga", "Lo cambias cuando quieras",
+    "%s pasa al equipo", "Te espera en el equipo" },
+  { "SWITCH", "LEARN THE MOVE FIRST", "NOT NOW", "FOLLOWING", "TO PARTY",
+    "Join the party?", "To the party", "Keep following", "Switch them back any time",
+    "%s can join the party", "See you in the party" },
+  { "CHANGER", "APPRENDS LE MOUVEMENT", "PAS MAINTENANT", "SUIT", "A L EQUIPE",
+    "Dans l equipe?", "A l equipe", "Il reste", "Tu pourras le rechanger",
+    "%s rejoint l equipe", "A bientot dans l equipe" },
+  { "WECHSELN", "LERNE ZUERST DIE ATTACKE", "NICHT JETZT", "FOLGT", "INS TEAM",
+    "Ins Team?", "Ins Team", "Bleibt hier", "Jederzeit zurueckholen",
+    "%s kommt ins Team", "Bis gleich im Team" },
+  { "CAMBIA", "IMPARA PRIMA LA MOSSA", "NON ORA", "SEGUE", "IN SQUADRA",
+    "In squadra?", "In squadra", "Resta qui", "Lo richiami quando vuoi",
+    "%s entra in squadra", "A presto in squadra" },
+  { "TROCAR", "APRENDE O GOLPE ANTES", "AGORA NAO", "SEGUE", "A EQUIPA",
+    "Para a equipa?", "A equipa", "Fica aqui", "Trocas quando quiseres",
+    "%s para a equipa", "Ate ja na equipa" },
 };
 
 const char *FT(FollowStr id) {
@@ -316,6 +328,16 @@ const char *FT(FollowStr id) {
   const char *s = F_STRINGS[l][id];
   return s ? s : "";
 }
+
+void followBankCopy(const char **q, const char **yes, const char **no, const char **sub) {
+  if (q) *q = FT(F_FAR_Q);
+  if (yes) *yes = FT(F_FAR_YES);
+  if (no) *no = FT(F_FAR_NO);
+  if (sub) *sub = FT(F_FAR_SUB);
+}
+
+const char *followFarewellBtnFmt() { return FT(F_FAR_BTN); }
+const char *followFarewellMsg() { return FT(F_FAR_MSG); }
 
 bool followSerial(const String &line) {
   if (line != "FOLLOW" && !line.startsWith("FOLLOW ")) return false;
