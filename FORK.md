@@ -21,7 +21,7 @@ this file is where the fork documents itself.
 - **Nothing positional is shared with upstream.** Strings live in the fork's own
   `W_STRINGS` table in `wild.cpp`, never in `i18n.cpp`'s positional `STRINGS`.
   The one NVS key is prefixed (`w_seen`). The `SCR_` enum is unchanged.
-- **`FW_VERSION` is the fork's own version** (`3.12.0`), no longer derived from
+- **`FW_VERSION` is the fork's own version** (`3.12.1`), no longer derived from
   upstream's. On an upstream merge keep the fork's line (tagged `FORK(wild)`, so the
   conflict is expected) and bump it when the fork releases. `web/manifest.json`
   carries the same number: `tools/build_web.ps1` and `build_web.sh` both copy it
