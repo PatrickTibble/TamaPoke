@@ -17,6 +17,9 @@ todos:
   - id: tests
     content: follow_test (round trip, freeze, refusals, fallback, journal, export size, strings) and follow_ui_test; negative-check each guard; run full suite
     status: pending
+  - id: farewell-once
+    content: "Farewell prompted once per creature: declineFarewell() sets farDeclinedAge to FAREWELL_NEVER (UINT32_MAX) via a FORK(follow) hook; FAREWELL button on the follower's details sheet whenever canFarewellNow(); carried in f_ext; tests"
+    status: pending
   - id: docs
     content: "FORK.md: rules, keys, eviction, hook list, legacy companion note"
     status: pending
@@ -34,7 +37,8 @@ isProject: false
 - **The box exchange stays as it is,** with the cap applied. TO PARTY, a grid swap and a farewell's party-then-box fallthrough all see the party as full at 5 banked members. The follower is not a box candidate directly: switch it out into the party first, and it can then be deposited like any other member.
 - **Switching is not allowed** during a ceremony, during the evolution animation, while the starter is still being picked, or while a move-learn offer is pending. A pending offer lives only in RAM, in `learnQueue`, and would be lost. Switching IS allowed while the follower is asleep; the incoming creature arrives awake.
 - **The incoming creature always grows.** Switching in clears `frozen`, so a legacy BRING BACK companion that is switched out and back starts ageing normally. This goes in `FORK.md`.
-- **A creature that has used up its 3 days** and is in final form gets the farewell offer as soon as it is switched in. That is the existing rule applied to its own age, and declining it uses the existing `farDeclinedAge`.
+- **Farewell is prompted only once per creature.** The first time a creature meets the current requirements (final form and at least `FAREWELL_AGE_MIN`, 3 days of its own age), the farewell offer pops up as it does today, including right after it is switched in. If the player declines, it is never auto-prompted again for that creature. This replaces upstream's re-offer every 24 hours.
+- **After that, farewell is on the details page.** Whenever `canFarewellNow()` holds, the creature's details sheet shows a FAREWELL button that starts the same ceremony, with the same banking and blessing. It is hidden until the requirements are met. See "Farewell prompted once" below.
 
 ## Fork strategy
 
@@ -132,6 +136,14 @@ At boot, `followLoad()` checks for a leftover `f_swap`:
 - [save.cpp](save.cpp): append `{ "f_ext", SK_BYTES }`. `f_swap` is deliberately left out, because a backup must not replay a half-finished swap.
 - [tools/emu/build.sh](tools/emu/build.sh) and [tools/emu/tests/run.sh](tools/emu/tests/run.sh): add `follow.cpp`, and add `follow_ui_test` to `needs_sketch`.
 
+## Farewell prompted once
+
+- **No new field.** `farDeclinedAge` already means "don't offer before this age". Declining sets it to a sentinel, `FAREWELL_NEVER` (`UINT32_MAX`), instead of `ageMinutes + 1440`, so `wantFarewellButton()` never fires the prompt again. This is a single `FORK(follow)` hook in `Pet::declineFarewell()` (`pet.h:338`). Saves stay compatible: upstream reads the sentinel as "not yet" and simply never re-offers.
+- **Survives switching.** `farDeclinedAge` is already in `FollowExt`, so a creature switched out and back in keeps its "already prompted" state. A creature with no ext record falls back to 0 and may be prompted once more, which is acceptable.
+- **The manual button.** `renderMonSheet()` for the live follower gets a FAREWELL button, drawn by `followDrawFarewell()` and tapped through `followTapFarewell()`, visible only when `canFarewellNow()` is true. It calls the existing `startFarewell()`. Banked party and box members do not get it, because they are frozen and their farewell happens by switching them in.
+- **New string:** `FT(F_FAREWELL)`, ASCII in all 6 languages.
+- **Tests (in `follow_test` / `follow_ui_test`):** the prompt fires once on reaching the requirements; after declining, 2 weeks of ticks never prompt again; the sheet button is hidden before the requirements and shown after; tapping it starts `CER_FAREWELL` and banks the creature exactly like the prompt does. Negative check: restore the 1440 re-offer and the "never again" test must fail.
+
 ## Tests
 
 These are new, fresh-harness suites. Each guard is negative-checked: break it on purpose and watch the test fail.
@@ -177,4 +189,5 @@ Create or append [FORK.md](FORK.md) with:
 - the eviction behaviour
 - every FORK(follow) hook
 - the note on legacy frozen companions
+- the farewell-once rule and the details-page FAREWELL button
 

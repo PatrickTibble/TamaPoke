@@ -34,6 +34,7 @@ const SaveField SAVE_FIELDS[] = {
   { "ghi", SK_U16 },    { "shi", SK_U16 },    { "qhi", SK_U16 },
   // the banked creatures
   { "party", SK_BYTES }, { "box", SK_BYTES },
+  { "f_ext", SK_BYTES },  // FORK(follow)
   // settings, so a restored device plays the way it did
   { "lang", SK_U8 },    { "snd", SK_BOOL },   { "vol", SK_U8 },
 };

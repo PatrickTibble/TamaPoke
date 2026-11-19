@@ -128,7 +128,7 @@ uint8_t Party::count() const {
 }
 
 int Party::firstFree() const {
-  for (int i = 0; i < PARTY_SLOTS; i++)
+  for (int i = 0; i < PARTY_CAP; i++) // FORK(follow)
     if (slots[i].empty()) return i;
   return -1;
 }
